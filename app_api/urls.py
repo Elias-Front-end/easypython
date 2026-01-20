@@ -3,6 +3,10 @@ from django.urls import path, include
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from .views import index, UserViewSet  # Importar views
 from tasks.views import TaskViewSet

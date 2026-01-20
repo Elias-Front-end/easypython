@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EasyPython API - Aprenda Fazendo</title>
+    <title>EasyPython API - Advanced Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -18,32 +18,45 @@
             to { transform: translateY(0); opacity: 1; }
         }
         .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
-        
-        .tutorial-highlight {
-            position: relative;
-            z-index: 50;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.5);
-            background-color: white;
-        }
-        .overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 40;
-        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800" x-data="app()">
 
+    <!-- Login Modal -->
+    <div x-show="showLogin" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" x-cloak>
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md border border-slate-200" @click.outside="showLogin = false">
+            <h2 class="text-2xl font-bold mb-2">Autenticação JWT</h2>
+            <p class="text-sm text-slate-500 mb-6">Obtenha um token para acessar rotas protegidas.</p>
+            
+            <form @submit.prevent="login" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Username</label>
+                    <input type="text" x-model="loginForm.username" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Password</label>
+                    <input type="password" x-model="loginForm.password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium transition" :disabled="isLoading">
+                    <span x-show="!isLoading">Obter Token</span>
+                    <span x-show="isLoading">...</span>
+                </button>
+            </form>
+            <div class="mt-4 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
+                Dica: Crie um usuário primeiro na rota de Usuários (POST) se ainda não tiver um.
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
-    <div class="fixed top-4 right-4 z-[100] space-y-2">
+    <div class="fixed top-4 right-4 z-[90] space-y-2">
         <template x-for="toast in toasts" :key="toast.id">
             <div x-show="toast.visible" x-transition.duration.300ms
-                 class="p-4 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] border-l-4"
+                 class="p-4 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] border-l-4 bg-white"
                  :class="{
-                     'bg-white border-green-500 text-slate-700': toast.type === 'success',
-                     'bg-white border-red-500 text-slate-700': toast.type === 'error',
-                     'bg-white border-blue-500 text-slate-700': toast.type === 'info'
+                     'border-green-500': toast.type === 'success',
+                     'border-red-500': toast.type === 'error',
+                     'border-blue-500': toast.type === 'info'
                  }">
                 <span x-text="toast.emoji" class="text-xl"></span>
                 <div>
@@ -54,50 +67,20 @@
         </template>
     </div>
 
-    <!-- Tutorial Overlay -->
-    <div x-show="tutorial.active" class="overlay" x-transition.opacity></div>
-
-    <!-- Tutorial Box -->
-    <div x-show="tutorial.active" 
-         class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg border border-indigo-100"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-10"
-         x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="flex items-start gap-4">
-            <div class="bg-indigo-100 p-3 rounded-full text-indigo-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-            </div>
-            <div class="flex-1">
-                <h3 class="font-bold text-lg text-indigo-900 mb-1" x-text="currentStep.title"></h3>
-                <p class="text-slate-600 text-sm mb-4 leading-relaxed" x-text="currentStep.text"></p>
-                
-                <div class="flex justify-between items-center">
-                    <span class="text-xs text-slate-400 font-mono" x-text="`Passo ${tutorial.step + 1}/${tutorialSteps.length}`"></span>
-                    <div class="space-x-2">
-                        <button @click="endTutorial" class="text-xs text-slate-500 hover:text-slate-800 px-3 py-2">Pular</button>
-                        <button @click="nextStep" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
-                            <span x-text="tutorial.step === tutorialSteps.length - 1 ? 'Concluir' : 'Próximo'"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div class="container mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="bg-indigo-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm">EP</div>
-                <h1 class="font-bold text-slate-800 hidden md:block">EasyPython Explorer</h1>
+                <h1 class="font-bold text-slate-800 hidden md:block">EasyPython API <span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-normal">v2.0</span></h1>
             </div>
 
             <!-- Route Switcher -->
-            <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200" :class="{'tutorial-highlight': tutorial.step === 1}">
+            <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                 <button @click="switchRoute('tasks')" 
                         class="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
                         :class="currentRoute === 'tasks' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
-                    Minhas Tarefas
+                    Tarefas
                 </button>
                 <button @click="switchRoute('users')" 
                         class="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
@@ -107,24 +90,20 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <!-- Level Toggle -->
-                <div class="hidden md:flex items-center gap-2 mr-4 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Modo:</span>
-                    <button @click="userLevel = 'beginner'" 
-                            class="text-xs font-medium px-2 py-0.5 rounded transition"
-                            :class="userLevel === 'beginner' ? 'bg-green-100 text-green-700' : 'text-slate-400 hover:text-slate-600'">
-                        Iniciante
-                    </button>
-                    <button @click="userLevel = 'advanced'" 
-                            class="text-xs font-medium px-2 py-0.5 rounded transition"
-                            :class="userLevel === 'advanced' ? 'bg-purple-100 text-purple-700' : 'text-slate-400 hover:text-slate-600'">
-                        Dev
-                    </button>
+                <!-- Auth Status -->
+                <div class="flex items-center gap-2">
+                    <template x-if="token">
+                        <div class="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200 text-xs font-medium cursor-pointer" @click="logout" title="Clique para sair">
+                            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            Autenticado
+                        </div>
+                    </template>
+                    <template x-if="!token">
+                        <button @click="showLogin = true" class="text-xs font-medium bg-slate-800 text-white px-3 py-1.5 rounded-full hover:bg-slate-700 transition">
+                            Login (JWT)
+                        </button>
+                    </template>
                 </div>
-                
-                <button @click="startTutorial" class="text-indigo-600 hover:bg-indigo-50 p-2 rounded-full transition" title="Reiniciar Tutorial">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                </button>
             </div>
         </div>
     </header>
@@ -132,165 +111,159 @@
     <main class="container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         <!-- Left Column: Interactive App -->
-        <div class="lg:col-span-7 space-y-8">
+        <div class="lg:col-span-7 space-y-6">
             
             <!-- Context Header -->
-            <div class="bg-indigo-600 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                <div class="absolute top-0 right-0 opacity-10">
-                    <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                </div>
-                <div class="relative z-10">
-                    <div class="flex items-center gap-2 mb-2 opacity-80">
-                        <span class="uppercase text-xs font-bold tracking-wider">Rota Atual</span>
-                        <span class="font-mono bg-indigo-700 px-2 py-0.5 rounded text-xs" x-text="`/api/${currentRoute}/`"></span>
+            <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white rounded-2xl p-6 shadow-lg relative overflow-hidden">
+                <div class="relative z-10 flex justify-between items-start">
+                    <div>
+                        <div class="flex items-center gap-2 mb-2 opacity-80">
+                            <span class="uppercase text-[10px] font-bold tracking-wider border border-white/30 px-1 rounded">RESOURCE</span>
+                            <span class="font-mono text-sm" x-text="`/api/${currentRoute}/`"></span>
+                        </div>
+                        <h2 class="text-2xl font-bold mb-2" x-text="currentRoute === 'tasks' ? 'Gerenciamento de Tarefas' : 'Gerenciamento de Usuários'"></h2>
+                        <div class="flex gap-2 text-xs">
+                            <span class="bg-white/20 px-2 py-0.5 rounded">Pagination: ON</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded">Filtering: ON</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded">Auth: JWT</span>
+                        </div>
                     </div>
-                    <h2 class="text-2xl font-bold mb-2" x-text="currentRoute === 'tasks' ? 'Gerenciador de Tarefas' : 'Visualizador de Usuários'"></h2>
-                    <p class="text-indigo-100 text-sm max-w-lg">
-                        <span x-show="currentRoute === 'tasks'">Aqui você pode criar, listar, editar e remover tarefas. Cada ação que você faz aqui envia um pedido real para o servidor.</span>
-                        <span x-show="currentRoute === 'users'">Esta rota é apenas de leitura. Você pode ver os usuários cadastrados no sistema, mas não pode alterá-los por aqui.</span>
-                    </p>
                 </div>
             </div>
 
-            <!-- Create Form (POST) -->
-            <div x-show="methods.includes('POST')" 
-                 class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm transition hover:shadow-md"
-                 :class="{'tutorial-highlight': tutorial.step === 2}">
-                
-                <div class="flex justify-between items-start mb-6">
-                    <div>
-                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                            Criar Novo Registro
-                            <span x-show="userLevel === 'advanced'" class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono">POST</span>
-                        </h3>
-                        <p class="text-slate-500 text-sm mt-1">Preencha os dados abaixo para enviar ao servidor.</p>
-                    </div>
+            <!-- Filters & Search -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center">
+                <div class="flex-1 min-w-[200px] relative">
+                    <svg class="w-4 h-4 absolute left-3 top-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" x-model="searchQuery" @input.debounce.500ms="fetchItems(1)"
+                           :placeholder="currentRoute === 'tasks' ? 'Buscar tarefa por título...' : 'Buscar usuário por nome/email...'"
+                           class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
+                
+                <!-- Extra Filters -->
+                <select x-show="currentRoute === 'tasks'" x-model="filters.completed" @change="fetchItems(1)" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
+                    <option value="">Todos Status</option>
+                    <option value="true">Concluídos</option>
+                    <option value="false">Pendentes</option>
+                </select>
+                
+                <select x-show="currentRoute === 'users'" x-model="filters.is_staff" @change="fetchItems(1)" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
+                    <option value="">Todos Tipos</option>
+                    <option value="true">Staff</option>
+                    <option value="false">Normal</option>
+                </select>
+            </div>
 
-                <form @submit.prevent="createItem" class="space-y-4">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-slate-700">Título da Tarefa <span class="text-red-500">*</span></label>
-                        <input type="text" x-model="newItem.title" 
-                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                               placeholder="Ex: Estudar Python" required>
-                    </div>
-                    
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-slate-700">Descrição <span class="text-slate-400 font-normal">(Opcional)</span></label>
-                        <textarea x-model="newItem.description" rows="2"
-                                  class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                  placeholder="Detalhes adicionais..."></textarea>
-                    </div>
+            <!-- Create Form (Generic) -->
+            <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono">POST</span>
+                    Criar Novo
+                </h3>
+                
+                <form @submit.prevent="createItem" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Fields for Tasks -->
+                    <template x-if="currentRoute === 'tasks'">
+                        <div class="contents">
+                            <div class="md:col-span-2">
+                                <input type="text" x-model="newItem.title" placeholder="Título da Tarefa *" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                            </div>
+                            <div class="md:col-span-2">
+                                <textarea x-model="newItem.description" rows="2" placeholder="Descrição..." class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                            </div>
+                        </div>
+                    </template>
 
-                    <div class="pt-2">
-                        <button type="submit" 
-                                class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center justify-center gap-2"
-                                :disabled="isLoading">
+                    <!-- Fields for Users -->
+                    <template x-if="currentRoute === 'users'">
+                        <div class="contents">
+                            <div>
+                                <input type="text" x-model="newItem.username" placeholder="Username *" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                            </div>
+                            <div>
+                                <input type="email" x-model="newItem.email" placeholder="Email" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div class="md:col-span-2">
+                                <input type="password" x-model="newItem.password" placeholder="Password *" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                                <p class="text-[10px] text-slate-400 mt-1">A senha será enviada com hash seguro pelo backend.</p>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="md:col-span-2 flex justify-end">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition flex items-center gap-2" :disabled="isLoading">
                             <span x-show="isLoading" class="animate-spin">⌛</span>
-                            <span>Enviar para o Servidor</span>
+                            Salvar
                         </button>
                     </div>
                 </form>
             </div>
 
             <!-- List (GET) -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-                 :class="{'tutorial-highlight': tutorial.step === 3}">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div>
-                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                            Lista de Registros
-                            <span x-show="userLevel === 'advanced'" class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-mono">GET</span>
-                        </h3>
-                        <p class="text-slate-500 text-sm mt-1" x-text="`Total: ${items.length} itens encontrados`"></p>
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-mono">GET</span>
+                        <span class="text-sm text-slate-500" x-text="`Página ${currentPage} de ${totalPages} • Total: ${totalCount}`"></span>
                     </div>
-                    <button @click="fetchItems" class="text-indigo-600 hover:text-indigo-800 p-2 hover:bg-indigo-50 rounded-lg transition" title="Atualizar Lista">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    </button>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="flex gap-1">
+                        <button @click="fetchItems(currentPage - 1)" :disabled="!prevUrl" class="px-3 py-1 text-xs border rounded hover:bg-slate-100 disabled:opacity-50">Anterior</button>
+                        <button @click="fetchItems(currentPage + 1)" :disabled="!nextUrl" class="px-3 py-1 text-xs border rounded hover:bg-slate-100 disabled:opacity-50">Próximo</button>
+                    </div>
                 </div>
 
                 <div class="divide-y divide-slate-100">
                     <template x-for="item in items" :key="item.id">
-                        <div class="p-4 hover:bg-slate-50 transition group flex items-start gap-4">
-                            <!-- Checkbox for Tasks -->
-                            <div x-show="currentRoute === 'tasks'" class="pt-1">
-                                <button @click="toggleItem(item)" 
-                                        class="w-6 h-6 border-2 rounded-lg flex items-center justify-center transition duration-200"
-                                        :class="item.completed ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-indigo-500'">
-                                    <svg x-show="item.completed" class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                                </button>
+                        <div class="p-4 hover:bg-slate-50 transition group flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <!-- Status Icon -->
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                                     :class="currentRoute === 'tasks' ? (item.completed ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600') : (item.is_staff ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600')">
+                                    <template x-if="currentRoute === 'tasks'">
+                                        <span x-text="item.completed ? '✓' : '⏳'"></span>
+                                    </template>
+                                    <template x-if="currentRoute === 'users'">
+                                        <span x-text="item.is_staff ? '🛡️' : '👤'"></span>
+                                    </template>
+                                </div>
+
+                                <div>
+                                    <h4 class="font-medium text-slate-800" x-text="item.title || item.username"></h4>
+                                    <p class="text-xs text-slate-500" x-text="item.description || item.email || 'Sem descrição'"></p>
+                                </div>
                             </div>
 
-                            <div class="flex-1">
-                                <div class="flex justify-between items-start">
-                                    <h4 class="font-medium text-slate-800 text-lg" 
-                                        :class="{'line-through text-slate-400': item.completed && currentRoute === 'tasks'}" 
-                                        x-text="item.title || item.username"></h4>
-                                    
-                                    <!-- Actions -->
-                                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" x-show="currentRoute === 'tasks'">
-                                        <button @click="deleteItem(item.id)" 
-                                                class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" 
-                                                title="Deletar Item">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="text-slate-500 text-sm mt-1" x-text="item.description || item.email || 'Sem descrição'"></p>
+                            <div class="flex items-center gap-2">
+                                <!-- Action Buttons -->
+                                <template x-if="currentRoute === 'tasks'">
+                                    <button @click="toggleItem(item)" class="text-xs border px-2 py-1 rounded hover:bg-slate-100 transition">
+                                        Status
+                                    </button>
+                                </template>
                                 
-                                <!-- Dev Info -->
-                                <div x-show="userLevel === 'advanced'" class="mt-2 pt-2 border-t border-slate-100">
-                                    <code class="text-[10px] text-slate-400 font-mono" x-text="`ID: ${item.id} • Created: ${new Date(item.created_at || item.date_joined).toLocaleDateString()}`"></code>
-                                </div>
+                                <button @click="deleteItem(item.id)" class="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition" title="Deletar">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
                             </div>
                         </div>
                     </template>
                     
-                    <div x-show="items.length === 0" class="p-12 text-center">
-                        <div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
-                        </div>
-                        <h4 class="text-slate-900 font-medium">Nenhum item encontrado</h4>
-                        <p class="text-slate-500 text-sm mt-1">Utilize o formulário acima para criar o primeiro registro.</p>
+                    <div x-show="items.length === 0" class="p-8 text-center text-slate-500 text-sm">
+                        Nenhum registro encontrado com os filtros atuais.
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Educational Console -->
+        <!-- Right Column: Console -->
         <div class="lg:col-span-5 space-y-6">
             
-            <!-- Learning Card -->
-            <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl p-6 border border-indigo-100 shadow-sm relative overflow-hidden">
-                <div class="flex items-start gap-4 relative z-10">
-                    <div class="bg-white p-3 rounded-xl shadow-sm text-2xl">🎓</div>
-                    <div>
-                        <h3 class="font-bold text-indigo-900">Como funciona?</h3>
-                        <p class="text-indigo-800/80 text-sm mt-2 leading-relaxed" x-show="userLevel === 'beginner'">
-                            Este site é um "Frontend" (interface visual) que conversa com o "Backend" (servidor Django).
-                            <br><br>
-                            Quando você clica em "Adicionar", seu navegador envia uma carta digital (requisição) para o servidor pedindo para salvar os dados. O servidor responde dizendo se deu certo.
-                        </p>
-                        <p class="text-indigo-800/80 text-sm mt-2 leading-relaxed" x-show="userLevel === 'advanced'">
-                            A aplicação utiliza <strong>Fetch API</strong> para comunicar com o Django REST Framework.
-                            <br><br>
-                            Observe o console abaixo para ver os headers, payloads e status codes reais de cada transação HTTP. O sistema suporta CORS e CSRF handling automático.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Console Log -->
-            <div class="bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[600px] border border-slate-800"
-                 :class="{'tutorial-highlight': tutorial.step === 4}">
+            <div class="bg-slate-900 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[600px] border border-slate-800">
                 <div class="bg-slate-950 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span class="ml-2 text-xs font-mono text-slate-400">Console de Rede</span>
-                    </div>
-                    <button @click="logs = []" class="text-xs text-slate-500 hover:text-white transition">Limpar</button>
+                    <span class="text-xs font-mono text-slate-400">Network Activity</span>
+                    <button @click="logs = []" class="text-xs text-slate-500 hover:text-white transition">Clear</button>
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs" id="console-logs">
@@ -309,33 +282,22 @@
                                               'bg-indigo-500/20 text-indigo-400': log.method === 'POST',
                                               'bg-yellow-500/20 text-yellow-400': log.method === 'PATCH',
                                               'bg-red-500/20 text-red-400': log.method === 'DELETE',
-                                              'bg-purple-500/20 text-purple-400': log.method === 'OPTIONS'
                                           }" x-text="log.method"></span>
-                                    <span class="text-slate-300" x-text="log.url"></span>
+                                    <span class="text-slate-300 break-all" x-text="log.url"></span>
                                 </div>
-                                <span :class="log.status < 300 ? 'text-green-400' : 'text-red-400'" x-text="log.status || 'PENDING'"></span>
+                                <span :class="log.status < 300 ? 'text-green-400' : 'text-red-400'" x-text="log.status || '...'"></span>
                             </div>
                             
-                            <!-- Beginner Explanation -->
-                            <div x-show="userLevel === 'beginner'" class="text-slate-400 mt-1 italic">
-                                <span x-show="log.method === 'GET'">📥 Pediu dados ao servidor...</span>
-                                <span x-show="log.method === 'POST'">📤 Enviou novos dados para salvar...</span>
-                                <span x-show="log.method === 'DELETE'">🗑️ Pediu para apagar um item...</span>
-                                <span x-show="log.method === 'PATCH'">📝 Pediu para atualizar um detalhe...</span>
+                            <!-- Auth Header Info -->
+                            <div x-show="log.headers && log.headers.Authorization" class="text-[10px] text-yellow-500/80 mb-1 truncate">
+                                🔒 Auth: Bearer <span x-text="log.headers.Authorization.substring(7, 20) + '...'"></span>
                             </div>
 
-                            <!-- Advanced Details -->
-                            <div x-show="userLevel === 'advanced' && log.payload" class="mt-2 bg-slate-800/50 p-2 rounded text-slate-300 overflow-x-auto">
-                                <div class="text-[10px] text-slate-500 mb-1">PAYLOAD:</div>
+                            <div x-show="log.payload" class="mt-2 bg-slate-800/50 p-2 rounded text-slate-300 overflow-x-auto">
                                 <pre x-text="JSON.stringify(log.payload, null, 2)"></pre>
                             </div>
                         </div>
                     </template>
-                    
-                    <div x-show="logs.length === 0" class="text-center text-slate-600 mt-20">
-                        <p>Aguardando interações...</p>
-                        <p class="text-[10px] mt-2">Clique nos botões ao lado para ver a mágica acontecer.</p>
-                    </div>
                 </div>
             </div>
         </div>
@@ -347,185 +309,177 @@
             return {
                 currentRoute: 'tasks',
                 items: [],
-                newItem: { title: '', description: '' },
+                newItem: { title: '', description: '', username: '', email: '', password: '' },
                 logs: [],
-                methods: ['GET', 'POST', 'PATCH', 'DELETE'],
                 isLoading: false,
-                userLevel: 'beginner', // beginner | advanced
                 toasts: [],
                 
-                // Tutorial System
-                tutorial: {
-                    active: false,
-                    step: 0
-                },
-                tutorialSteps: [
-                    { 
-                        title: "Bem-vindo ao EasyPython Explorer! 👋", 
-                        text: "Esta interface foi criada para te ensinar como APIs funcionam na prática. Vamos fazer um tour rápido?" 
-                    },
-                    { 
-                        title: "Rotas da API", 
-                        text: "Aqui você escolhe qual 'recurso' quer gerenciar. 'Tarefas' permite criar e editar. 'Usuários' é apenas para leitura." 
-                    },
-                    { 
-                        title: "Criando Dados (POST)", 
-                        text: "Use este formulário para enviar informações para o servidor. Em termos técnicos, isso é uma requisição POST." 
-                    },
-                    { 
-                        title: "Visualizando Dados (GET)", 
-                        text: "Aqui aparecem os itens salvos no banco de dados. O navegador faz um pedido GET para buscar essa lista." 
-                    },
-                    { 
-                        title: "O Console Mágico", 
-                        text: "Tudo o que acontece nos bastidores aparece aqui. É como um raio-X da comunicação entre seu navegador e o servidor." 
-                    }
-                ],
-
-                get currentStep() {
-                    return this.tutorialSteps[this.tutorial.step];
-                },
+                // Auth
+                token: localStorage.getItem('access_token') || null,
+                showLogin: false,
+                loginForm: { username: '', password: '' },
+                
+                // Pagination & Filters
+                currentPage: 1,
+                totalPages: 1,
+                totalCount: 0,
+                nextUrl: null,
+                prevUrl: null,
+                searchQuery: '',
+                filters: { completed: '', is_staff: '' },
 
                 init() {
                     this.fetchItems();
-                    
-                    // Auto-start tutorial if first visit (simulated)
-                    if (!localStorage.getItem('tutorialDone')) {
-                        setTimeout(() => this.startTutorial(), 1000);
-                    }
                 },
 
-                // Tutorial Methods
-                startTutorial() {
-                    this.tutorial.active = true;
-                    this.tutorial.step = 0;
-                    this.userLevel = 'beginner'; // Force beginner mode for tutorial
-                },
-                nextStep() {
-                    if (this.tutorial.step < this.tutorialSteps.length - 1) {
-                        this.tutorial.step++;
-                    } else {
-                        this.endTutorial();
+                // Auth Methods
+                async login() {
+                    this.isLoading = true;
+                    const success = await this.apiCall('POST', 'token/', this.loginForm, true); // true = auth route
+                    if (success) {
+                        this.token = success.access;
+                        localStorage.setItem('access_token', this.token);
+                        this.showLogin = false;
+                        this.loginForm = { username: '', password: '' };
+                        this.showToast('success', 'Login Realizado', 'Token JWT recebido e armazenado.');
+                        this.fetchItems(); // Refresh with permissions
                     }
+                    this.isLoading = false;
                 },
-                endTutorial() {
-                    this.tutorial.active = false;
-                    localStorage.setItem('tutorialDone', 'true');
-                    this.showToast('success', 'Tutorial Concluído!', 'Agora você está pronto para explorar.');
+
+                logout() {
+                    this.token = null;
+                    localStorage.removeItem('access_token');
+                    this.showToast('info', 'Logout', 'Token removido.');
+                    this.fetchItems();
                 },
 
                 // Routing
                 switchRoute(route) {
                     this.currentRoute = route;
+                    this.currentPage = 1;
+                    this.searchQuery = '';
                     this.items = [];
                     this.fetchItems();
-                    
-                    // Update available methods based on route
-                    if (route === 'users') {
-                        this.methods = ['GET'];
-                        this.showToast('info', 'Modo Leitura', 'A rota de Usuários é protegida contra alterações.');
-                    } else {
-                        this.methods = ['GET', 'POST', 'PATCH', 'DELETE'];
-                    }
                 },
 
                 // API Interactions
-                async fetchItems() {
+                async fetchItems(page = 1) {
                     this.isLoading = true;
-                    await this.apiCall('GET', '');
+                    this.currentPage = page;
+                    
+                    // Build Query Params
+                    const params = new URLSearchParams({ page: page });
+                    if (this.searchQuery) params.append('search', this.searchQuery);
+                    if (this.currentRoute === 'tasks' && this.filters.completed) params.append('completed', this.filters.completed);
+                    if (this.currentRoute === 'users' && this.filters.is_staff) params.append('is_staff', this.filters.is_staff);
+
+                    const data = await this.apiCall('GET', `api/${this.currentRoute}/?${params.toString()}`, null, true);
+                    
+                    if (data) {
+                        this.items = data.results;
+                        this.totalCount = data.count;
+                        this.totalPages = Math.ceil(data.count / 10); // Assuming page size 10
+                        this.nextUrl = data.next;
+                        this.prevUrl = data.previous;
+                    }
                     this.isLoading = false;
                 },
 
                 async createItem() {
-                    if (!this.newItem.title) {
-                        this.showToast('error', 'Ops!', 'O título é obrigatório.');
-                        return;
-                    }
                     this.isLoading = true;
-                    const success = await this.apiCall('POST', '', this.newItem);
+                    // Clean payload based on route
+                    const payload = this.currentRoute === 'tasks' 
+                        ? { title: this.newItem.title, description: this.newItem.description }
+                        : { username: this.newItem.username, email: this.newItem.email, password: this.newItem.password };
+
+                    const success = await this.apiCall('POST', `api/${this.currentRoute}/`, payload, true);
                     if (success) {
-                        this.newItem = { title: '', description: '' };
-                        this.showToast('success', 'Sucesso!', 'Item criado no servidor.');
-                        // Refresh list
-                        this.fetchItems();
+                        this.newItem = { title: '', description: '', username: '', email: '', password: '' };
+                        this.showToast('success', 'Criado!', 'Registro adicionado com sucesso.');
+                        this.fetchItems(1);
                     }
                     this.isLoading = false;
                 },
 
                 async deleteItem(id) {
-                    if (!confirm('Tem certeza que deseja apagar?')) return;
-                    const success = await this.apiCall('DELETE', `${id}/`);
-                    if (success) {
+                    if (!confirm('Tem certeza?')) return;
+                    const success = await this.apiCall('DELETE', `api/${this.currentRoute}/${id}/`, null, true);
+                    if (success !== false) { // Delete returns 204 (no content) which is falsy in some checks, so check strict false
                         this.items = this.items.filter(i => i.id !== id);
-                        this.showToast('success', 'Apagado!', 'O item foi removido do banco de dados.');
+                        this.showToast('success', 'Removido', 'Registro apagado.');
                     }
                 },
 
                 async toggleItem(item) {
+                    if (this.currentRoute !== 'tasks') return;
                     const original = item.completed;
-                    item.completed = !item.completed; // Optimistic update
+                    item.completed = !item.completed;
                     
-                    const success = await this.apiCall('PATCH', `${item.id}/`, { completed: item.completed });
+                    const success = await this.apiCall('PATCH', `api/${this.currentRoute}/${item.id}/`, { completed: item.completed }, true);
                     if (!success) {
-                        item.completed = original; // Revert
-                        this.showToast('error', 'Erro', 'Não foi possível atualizar o status.');
+                        item.completed = original;
+                        this.showToast('error', 'Erro', 'Falha ao atualizar.');
                     }
                 },
 
                 // Core API Logic
-                async apiCall(method, path, body = null) {
-                    const url = `/api/${this.currentRoute}/${path}`;
+                async apiCall(method, path, body = null, isFullUrl = false) {
+                    // Handle URL construction logic
+                    let url = isFullUrl ? path : `api/${path}`;
+                    if (!url.startsWith('api/') && !url.startsWith('token/')) url = `api/${url}`; // Safety
+                    if (url.startsWith('api/api/')) url = url.substring(4); // Double api fix
+
+                    // Normalize URL to be root-relative
+                    url = '/' + url.replace(/^\/+/, '');
+
                     const logId = Date.now();
-                    
-                    // Add pending log
-                    this.logs.unshift({
-                        id: logId,
-                        method,
-                        url,
-                        status: 0, // Pending
-                        payload: body
-                    });
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+                    this.logs.unshift({ id: logId, method, url, status: 0, payload: body, headers: this.token ? { Authorization: headers.Authorization } : null });
 
                     try {
-                        const options = {
-                            method,
-                            headers: { 'Content-Type': 'application/json' }
-                        };
+                        const options = { method, headers };
                         if (body) options.body = JSON.stringify(body);
 
                         const res = await fetch(url, options);
                         
-                        // Update log with status
+                        // Update Log
                         const logIndex = this.logs.findIndex(l => l.id === logId);
-                        if (logIndex !== -1) {
-                            this.logs[logIndex].status = res.status;
+                        if (logIndex !== -1) this.logs[logIndex].status = res.status;
+
+                        if (res.status === 204) return true; // No content
+
+                        const data = await res.json();
+                        
+                        if (!res.ok) {
+                            // Handle Errors
+                            if (res.status === 401) {
+                                this.showToast('error', 'Não Autorizado', 'Faça login para realizar esta ação.');
+                                if (this.token) this.logout(); // Expired token
+                            } else {
+                                const errorMsg = JSON.stringify(data).substring(0, 50);
+                                this.showToast('error', `Erro ${res.status}`, errorMsg);
+                            }
+                            return false;
                         }
 
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                        // Handle response data
-                        if (method === 'GET') {
-                            this.items = await res.json();
-                        }
-                        return true;
+                        return data;
 
                     } catch (error) {
                         console.error(error);
                         const logIndex = this.logs.findIndex(l => l.id === logId);
-                        if (logIndex !== -1) {
-                            this.logs[logIndex].status = 'ERR';
-                        }
-                        this.showToast('error', 'Erro de Conexão', 'Não foi possível falar com o servidor.');
+                        if (logIndex !== -1) this.logs[logIndex].status = 'ERR';
+                        this.showToast('error', 'Erro de Rede', 'Verifique sua conexão.');
                         return false;
                     }
                 },
 
-                // Toast System
                 showToast(type, title, message) {
                     const id = Date.now();
                     const emojis = { success: '✅', error: '❌', info: '💡' };
                     this.toasts.push({ id, type, title, message, emoji: emojis[type], visible: true });
-                    
                     setTimeout(() => {
                         const index = this.toasts.findIndex(t => t.id === id);
                         if (index !== -1) this.toasts[index].visible = false;
