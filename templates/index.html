@@ -3,373 +3,533 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EasyPython API Explorer</title>
-    <!-- Tailwind CSS -->
+    <title>EasyPython API - Aprenda Fazendo</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
         [x-cloak] { display: none !important; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'Fira Code', monospace; }
+        
+        /* Animações */
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+        
+        .tutorial-highlight {
+            position: relative;
+            z-index: 50;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.5);
+            background-color: white;
+        }
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 40;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans text-gray-800" x-data="apiExplorer()">
+<body class="bg-slate-50 text-slate-800" x-data="app()">
 
-    <!-- Navbar -->
-    <nav class="bg-gradient-to-r from-indigo-700 to-indigo-600 text-white shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
-            <div class="flex items-center space-x-2">
-                <span class="text-2xl">⚡</span>
-                <h1 class="text-xl font-bold tracking-tight">EasyPython Explorer</h1>
-            </div>
-            
-            <!-- Route Selector -->
-            <div class="flex items-center bg-indigo-800 rounded-lg p-1 border border-indigo-500">
-                <span class="px-3 text-xs text-indigo-300 font-mono">ROTA ATUAL:</span>
-                <select x-model="currentRoute" @change="handleRouteChange" 
-                        class="bg-transparent text-white text-sm font-mono focus:outline-none py-1 px-2 cursor-pointer">
-                    <option value="tasks">/api/tasks/</option>
-                    <option value="users">/api/users/</option>
-                </select>
-            </div>
-
-            <div class="space-x-4 text-sm hidden md:block">
-                <a href="/api/docs/" target="_blank" class="hover:text-indigo-200 transition">Swagger</a>
-                <a href="/admin/" target="_blank" class="hover:text-indigo-200 transition">Admin</a>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container mx-auto px-4 py-8">
-        
-        <!-- Dynamic Auto-Help Header -->
-        <div class="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-fade-in">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+    <!-- Toast Notifications -->
+    <div class="fixed top-4 right-4 z-[100] space-y-2">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div x-show="toast.visible" x-transition.duration.300ms
+                 class="p-4 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] border-l-4"
+                 :class="{
+                     'bg-white border-green-500 text-slate-700': toast.type === 'success',
+                     'bg-white border-red-500 text-slate-700': toast.type === 'error',
+                     'bg-white border-blue-500 text-slate-700': toast.type === 'info'
+                 }">
+                <span x-text="toast.emoji" class="text-xl"></span>
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                        <span x-text="routeInfo.name || 'Carregando...'"></span>
-                        <span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500 font-normal border border-gray-200">Recurso</span>
-                    </h2>
-                    <p class="text-gray-600 mt-1" x-text="routeInfo.description || 'Selecione uma rota para ver a documentação automática.'"></p>
-                </div>
-                <div class="flex gap-2">
-                    <template x-for="method in availableMethods" :key="method">
-                        <span class="px-3 py-1 rounded text-xs font-bold border"
-                              :class="{
-                                  'bg-green-50 border-green-200 text-green-700': method === 'GET',
-                                  'bg-indigo-50 border-indigo-200 text-indigo-700': method === 'POST',
-                                  'bg-blue-50 border-blue-200 text-blue-700': method === 'PUT',
-                                  'bg-red-50 border-red-200 text-red-700': method === 'DELETE'
-                              }" x-text="method"></span>
-                    </template>
+                    <h4 class="font-bold text-sm" x-text="toast.title"></h4>
+                    <p class="text-xs opacity-90" x-text="toast.message"></p>
                 </div>
             </div>
-            
-            <!-- Schema Info -->
-            <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 text-sm">
-                <h3 class="font-bold text-gray-700 mb-2 flex items-center gap-2">
-                    <span>💡</span> O que você pode fazer aqui?
-                </h3>
-                <ul class="space-y-2 text-gray-600">
-                    <li x-show="availableMethods.includes('GET')" class="flex gap-2">
-                        <span class="font-mono text-green-600 font-bold">GET</span>
-                        <span>Listar todos os registros de <span class="font-semibold" x-text="routeInfo.name"></span>.</span>
-                    </li>
-                    <li x-show="availableMethods.includes('POST')" class="flex gap-2">
-                        <span class="font-mono text-indigo-600 font-bold">POST</span>
-                        <span>Criar novo item enviando: <code class="bg-gray-200 px-1 rounded text-xs" x-text="getPostFields()"></code></span>
-                    </li>
-                    <li x-show="!availableMethods.includes('POST') && !isLoading" class="flex gap-2 text-gray-400">
-                        <span class="font-mono">POST</span>
-                        <span>Criação não permitida nesta rota (Apenas Leitura).</span>
-                    </li>
-                </ul>
-            </div>
-        </div>
+        </template>
+    </div>
 
-        <!-- Main Content Area -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            <!-- Left Column: Interactive UI -->
-            <div class="lg:col-span-2 space-y-6">
+    <!-- Tutorial Overlay -->
+    <div x-show="tutorial.active" class="overlay" x-transition.opacity></div>
+
+    <!-- Tutorial Box -->
+    <div x-show="tutorial.active" 
+         class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg border border-indigo-100"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-10"
+         x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="flex items-start gap-4">
+            <div class="bg-indigo-100 p-3 rounded-full text-indigo-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-bold text-lg text-indigo-900 mb-1" x-text="currentStep.title"></h3>
+                <p class="text-slate-600 text-sm mb-4 leading-relaxed" x-text="currentStep.text"></p>
                 
-                <!-- CUSTOM UI FOR TASKS -->
-                <div x-show="currentRoute === 'tasks'" x-transition>
-                    <!-- Create Task Form -->
-                    <div class="bg-white rounded-xl shadow-md p-6 border-t-4 border-indigo-500 mb-6 relative group/card">
-                        <div class="absolute top-4 right-4 text-gray-400 hover:text-indigo-600 cursor-help" title="Ajuda do POST" @click="toggleHelp('post')">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <h3 class="text-lg font-semibold mb-4 text-gray-700">Nova Tarefa</h3>
-                        
-                        <div x-show="activeHelp === 'post'" class="mb-4 bg-indigo-50 p-3 rounded text-xs text-indigo-800 border border-indigo-100">
-                            <strong>POST /api/tasks/</strong>: Envia um JSON com <code>title</code> e <code>description</code> para criar.
-                        </div>
-
-                        <form @submit.prevent="createTask" class="space-y-4">
-                            <input type="text" x-model="newTask.title" placeholder="Título da tarefa..." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                            <textarea x-model="newTask.description" placeholder="Descrição (opcional)..." rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition" :disabled="isLoading">
-                                <span x-show="!isLoading">Adicionar Tarefa</span>
-                                <span x-show="isLoading">...</span>
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Task List -->
-                    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 class="font-semibold text-gray-700">Lista de Tarefas</h3>
-                            <button @click="fetchData" class="text-indigo-600 text-sm font-medium hover:underline">Atualizar</button>
-                        </div>
-                        <ul class="divide-y divide-gray-200">
-                            <template x-for="item in dataList" :key="item.id">
-                                <li class="p-4 hover:bg-gray-50 transition group">
-                                    <div class="flex items-start justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <button @click="toggleTask(item)" 
-                                                    class="w-5 h-5 border-2 rounded flex items-center justify-center transition"
-                                                    :class="item.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-indigo-500'">
-                                                <svg x-show="item.completed" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                                            </button>
-                                            <div>
-                                                <p class="font-medium text-gray-900" :class="{'line-through text-gray-400': item.completed}" x-text="item.title"></p>
-                                                <p class="text-sm text-gray-500" x-text="item.description"></p>
-                                            </div>
-                                        </div>
-                                        <button @click="deleteTask(item.id)" class="text-gray-300 hover:text-red-500 transition px-2">
-                                            🗑️
-                                        </button>
-                                    </div>
-                                </li>
-                            </template>
-                            <li x-show="dataList.length === 0" class="p-8 text-center text-gray-500">Nenhuma tarefa encontrada.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- GENERIC UI FOR OTHER ROUTES (USERS) -->
-                <div x-show="currentRoute !== 'tasks'" x-transition x-cloak>
-                    <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 class="font-semibold text-gray-700 flex items-center gap-2">
-                                <span>📂</span> Explorador de Dados
-                            </h3>
-                            <button @click="fetchData" class="text-indigo-600 text-sm font-medium hover:underline">Atualizar</button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">JSON Data</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <template x-for="item in dataList" :key="item.id || Math.random()">
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-6 py-4 whitespace-pre-wrap text-xs font-mono text-gray-600">
-                                                <span x-text="JSON.stringify(item, null, 2)"></span>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                    <tr x-show="dataList.length === 0">
-                                        <td class="px-6 py-8 text-center text-gray-500">Nenhum registro encontrado.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Generic Create Form (Disabled if not POST) -->
-                    <div x-show="availableMethods.includes('POST')" class="mt-6 bg-white rounded-xl shadow-md p-6 border-t-4 border-gray-400 opacity-50 relative">
-                         <div class="absolute inset-0 flex items-center justify-center bg-gray-50/50">
-                             <span class="bg-white px-4 py-2 rounded-full shadow text-sm font-medium text-gray-600">Formulário Genérico (Em breve)</span>
-                         </div>
-                         <h3 class="text-lg font-semibold mb-4 text-gray-700">Criar Novo</h3>
-                         <div class="h-24 bg-gray-100 rounded animate-pulse"></div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Right Column: Console -->
-            <div class="lg:col-span-1">
-                <div class="sticky top-20">
-                    <div class="bg-gray-900 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col h-[500px]">
-                        <div class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center">
-                            <span class="text-xs font-mono text-green-400">➜ API Logs</span>
-                            <button @click="logs = []" class="text-xs text-gray-500 hover:text-white">Limpar</button>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs" id="console-logs">
-                            <template x-if="logs.length === 0">
-                                <div class="text-gray-600 text-center mt-10 opacity-50">
-                                    Aguardando requisições...
-                                </div>
-                            </template>
-                            <template x-for="(log, i) in logs" :key="i">
-                                <div class="border-b border-gray-800 pb-2 last:border-0 animate-fade-in-up">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="px-1 rounded font-bold text-[10px]"
-                                              :class="{
-                                                  'bg-green-900 text-green-300': log.method === 'GET',
-                                                  'bg-indigo-900 text-indigo-300': log.method === 'POST',
-                                                  'bg-blue-900 text-blue-300': log.method === 'PUT' || log.method === 'PATCH',
-                                                  'bg-red-900 text-red-300': log.method === 'DELETE',
-                                                  'bg-purple-900 text-purple-300': log.method === 'OPTIONS'
-                                              }" x-text="log.method"></span>
-                                        <span class="text-gray-400 truncate" x-text="log.url"></span>
-                                        <span class="ml-auto" :class="log.status < 300 ? 'text-green-400' : 'text-red-400'" x-text="log.status"></span>
-                                    </div>
-                                    <template x-if="log.info">
-                                         <div class="text-purple-300 mb-1 italic" x-text="log.info"></div>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 text-sm text-blue-800">
-                        <p><strong>Status do Console:</strong> <span class="text-green-600">Ativo</span></p>
-                        <p class="text-xs mt-1 text-blue-600">Este painel monitora todas as chamadas `fetch` feitas por esta página.</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-slate-400 font-mono" x-text="`Passo ${tutorial.step + 1}/${tutorialSteps.length}`"></span>
+                    <div class="space-x-2">
+                        <button @click="endTutorial" class="text-xs text-slate-500 hover:text-slate-800 px-3 py-2">Pular</button>
+                        <button @click="nextStep" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                            <span x-text="tutorial.step === tutorialSteps.length - 1 ? 'Concluir' : 'Próximo'"></span>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="container mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm">EP</div>
+                <h1 class="font-bold text-slate-800 hidden md:block">EasyPython Explorer</h1>
+            </div>
+
+            <!-- Route Switcher -->
+            <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200" :class="{'tutorial-highlight': tutorial.step === 1}">
+                <button @click="switchRoute('tasks')" 
+                        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
+                        :class="currentRoute === 'tasks' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                    Minhas Tarefas
+                </button>
+                <button @click="switchRoute('users')" 
+                        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
+                        :class="currentRoute === 'users' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                    Usuários
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- Level Toggle -->
+                <div class="hidden md:flex items-center gap-2 mr-4 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Modo:</span>
+                    <button @click="userLevel = 'beginner'" 
+                            class="text-xs font-medium px-2 py-0.5 rounded transition"
+                            :class="userLevel === 'beginner' ? 'bg-green-100 text-green-700' : 'text-slate-400 hover:text-slate-600'">
+                        Iniciante
+                    </button>
+                    <button @click="userLevel = 'advanced'" 
+                            class="text-xs font-medium px-2 py-0.5 rounded transition"
+                            :class="userLevel === 'advanced' ? 'bg-purple-100 text-purple-700' : 'text-slate-400 hover:text-slate-600'">
+                        Dev
+                    </button>
+                </div>
+                
+                <button @click="startTutorial" class="text-indigo-600 hover:bg-indigo-50 p-2 rounded-full transition" title="Reiniciar Tutorial">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Column: Interactive App -->
+        <div class="lg:col-span-7 space-y-8">
+            
+            <!-- Context Header -->
+            <div class="bg-indigo-600 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10">
+                    <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex items-center gap-2 mb-2 opacity-80">
+                        <span class="uppercase text-xs font-bold tracking-wider">Rota Atual</span>
+                        <span class="font-mono bg-indigo-700 px-2 py-0.5 rounded text-xs" x-text="`/api/${currentRoute}/`"></span>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-2" x-text="currentRoute === 'tasks' ? 'Gerenciador de Tarefas' : 'Visualizador de Usuários'"></h2>
+                    <p class="text-indigo-100 text-sm max-w-lg">
+                        <span x-show="currentRoute === 'tasks'">Aqui você pode criar, listar, editar e remover tarefas. Cada ação que você faz aqui envia um pedido real para o servidor.</span>
+                        <span x-show="currentRoute === 'users'">Esta rota é apenas de leitura. Você pode ver os usuários cadastrados no sistema, mas não pode alterá-los por aqui.</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Create Form (POST) -->
+            <div x-show="methods.includes('POST')" 
+                 class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm transition hover:shadow-md"
+                 :class="{'tutorial-highlight': tutorial.step === 2}">
+                
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                            Criar Novo Registro
+                            <span x-show="userLevel === 'advanced'" class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono">POST</span>
+                        </h3>
+                        <p class="text-slate-500 text-sm mt-1">Preencha os dados abaixo para enviar ao servidor.</p>
+                    </div>
+                </div>
+
+                <form @submit.prevent="createItem" class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-slate-700">Título da Tarefa <span class="text-red-500">*</span></label>
+                        <input type="text" x-model="newItem.title" 
+                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                               placeholder="Ex: Estudar Python" required>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-slate-700">Descrição <span class="text-slate-400 font-normal">(Opcional)</span></label>
+                        <textarea x-model="newItem.description" rows="2"
+                                  class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                  placeholder="Detalhes adicionais..."></textarea>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" 
+                                class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center justify-center gap-2"
+                                :disabled="isLoading">
+                            <span x-show="isLoading" class="animate-spin">⌛</span>
+                            <span>Enviar para o Servidor</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- List (GET) -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                 :class="{'tutorial-highlight': tutorial.step === 3}">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                            Lista de Registros
+                            <span x-show="userLevel === 'advanced'" class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-mono">GET</span>
+                        </h3>
+                        <p class="text-slate-500 text-sm mt-1" x-text="`Total: ${items.length} itens encontrados`"></p>
+                    </div>
+                    <button @click="fetchItems" class="text-indigo-600 hover:text-indigo-800 p-2 hover:bg-indigo-50 rounded-lg transition" title="Atualizar Lista">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                </div>
+
+                <div class="divide-y divide-slate-100">
+                    <template x-for="item in items" :key="item.id">
+                        <div class="p-4 hover:bg-slate-50 transition group flex items-start gap-4">
+                            <!-- Checkbox for Tasks -->
+                            <div x-show="currentRoute === 'tasks'" class="pt-1">
+                                <button @click="toggleItem(item)" 
+                                        class="w-6 h-6 border-2 rounded-lg flex items-center justify-center transition duration-200"
+                                        :class="item.completed ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-indigo-500'">
+                                    <svg x-show="item.completed" class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                            </div>
+
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <h4 class="font-medium text-slate-800 text-lg" 
+                                        :class="{'line-through text-slate-400': item.completed && currentRoute === 'tasks'}" 
+                                        x-text="item.title || item.username"></h4>
+                                    
+                                    <!-- Actions -->
+                                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" x-show="currentRoute === 'tasks'">
+                                        <button @click="deleteItem(item.id)" 
+                                                class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" 
+                                                title="Deletar Item">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-slate-500 text-sm mt-1" x-text="item.description || item.email || 'Sem descrição'"></p>
+                                
+                                <!-- Dev Info -->
+                                <div x-show="userLevel === 'advanced'" class="mt-2 pt-2 border-t border-slate-100">
+                                    <code class="text-[10px] text-slate-400 font-mono" x-text="`ID: ${item.id} • Created: ${new Date(item.created_at || item.date_joined).toLocaleDateString()}`"></code>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="items.length === 0" class="p-12 text-center">
+                        <div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                        </div>
+                        <h4 class="text-slate-900 font-medium">Nenhum item encontrado</h4>
+                        <p class="text-slate-500 text-sm mt-1">Utilize o formulário acima para criar o primeiro registro.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Educational Console -->
+        <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Learning Card -->
+            <div class="bg-gradient-to-br from-indigo-50 to-white rounded-2xl p-6 border border-indigo-100 shadow-sm relative overflow-hidden">
+                <div class="flex items-start gap-4 relative z-10">
+                    <div class="bg-white p-3 rounded-xl shadow-sm text-2xl">🎓</div>
+                    <div>
+                        <h3 class="font-bold text-indigo-900">Como funciona?</h3>
+                        <p class="text-indigo-800/80 text-sm mt-2 leading-relaxed" x-show="userLevel === 'beginner'">
+                            Este site é um "Frontend" (interface visual) que conversa com o "Backend" (servidor Django).
+                            <br><br>
+                            Quando você clica em "Adicionar", seu navegador envia uma carta digital (requisição) para o servidor pedindo para salvar os dados. O servidor responde dizendo se deu certo.
+                        </p>
+                        <p class="text-indigo-800/80 text-sm mt-2 leading-relaxed" x-show="userLevel === 'advanced'">
+                            A aplicação utiliza <strong>Fetch API</strong> para comunicar com o Django REST Framework.
+                            <br><br>
+                            Observe o console abaixo para ver os headers, payloads e status codes reais de cada transação HTTP. O sistema suporta CORS e CSRF handling automático.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Console Log -->
+            <div class="bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[600px] border border-slate-800"
+                 :class="{'tutorial-highlight': tutorial.step === 4}">
+                <div class="bg-slate-950 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="ml-2 text-xs font-mono text-slate-400">Console de Rede</span>
+                    </div>
+                    <button @click="logs = []" class="text-xs text-slate-500 hover:text-white transition">Limpar</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs" id="console-logs">
+                    <template x-for="log in logs" :key="log.id">
+                        <div class="animate-slide-in border-l-2 pl-3 py-1"
+                             :class="{
+                                 'border-green-500': log.status < 300,
+                                 'border-red-500': log.status >= 400,
+                                 'border-blue-500': log.status === 0
+                             }">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold px-1.5 py-0.5 rounded text-[10px]"
+                                          :class="{
+                                              'bg-green-500/20 text-green-400': log.method === 'GET',
+                                              'bg-indigo-500/20 text-indigo-400': log.method === 'POST',
+                                              'bg-yellow-500/20 text-yellow-400': log.method === 'PATCH',
+                                              'bg-red-500/20 text-red-400': log.method === 'DELETE',
+                                              'bg-purple-500/20 text-purple-400': log.method === 'OPTIONS'
+                                          }" x-text="log.method"></span>
+                                    <span class="text-slate-300" x-text="log.url"></span>
+                                </div>
+                                <span :class="log.status < 300 ? 'text-green-400' : 'text-red-400'" x-text="log.status || 'PENDING'"></span>
+                            </div>
+                            
+                            <!-- Beginner Explanation -->
+                            <div x-show="userLevel === 'beginner'" class="text-slate-400 mt-1 italic">
+                                <span x-show="log.method === 'GET'">📥 Pediu dados ao servidor...</span>
+                                <span x-show="log.method === 'POST'">📤 Enviou novos dados para salvar...</span>
+                                <span x-show="log.method === 'DELETE'">🗑️ Pediu para apagar um item...</span>
+                                <span x-show="log.method === 'PATCH'">📝 Pediu para atualizar um detalhe...</span>
+                            </div>
+
+                            <!-- Advanced Details -->
+                            <div x-show="userLevel === 'advanced' && log.payload" class="mt-2 bg-slate-800/50 p-2 rounded text-slate-300 overflow-x-auto">
+                                <div class="text-[10px] text-slate-500 mb-1">PAYLOAD:</div>
+                                <pre x-text="JSON.stringify(log.payload, null, 2)"></pre>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="logs.length === 0" class="text-center text-slate-600 mt-20">
+                        <p>Aguardando interações...</p>
+                        <p class="text-[10px] mt-2">Clique nos botões ao lado para ver a mágica acontecer.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
     <script>
-        function apiExplorer() {
+        function app() {
             return {
                 currentRoute: 'tasks',
-                dataList: [],
-                routeInfo: {},
-                availableMethods: [],
-                newTask: { title: '', description: '' },
+                items: [],
+                newItem: { title: '', description: '' },
                 logs: [],
+                methods: ['GET', 'POST', 'PATCH', 'DELETE'],
                 isLoading: false,
-                activeHelp: null,
+                userLevel: 'beginner', // beginner | advanced
+                toasts: [],
+                
+                // Tutorial System
+                tutorial: {
+                    active: false,
+                    step: 0
+                },
+                tutorialSteps: [
+                    { 
+                        title: "Bem-vindo ao EasyPython Explorer! 👋", 
+                        text: "Esta interface foi criada para te ensinar como APIs funcionam na prática. Vamos fazer um tour rápido?" 
+                    },
+                    { 
+                        title: "Rotas da API", 
+                        text: "Aqui você escolhe qual 'recurso' quer gerenciar. 'Tarefas' permite criar e editar. 'Usuários' é apenas para leitura." 
+                    },
+                    { 
+                        title: "Criando Dados (POST)", 
+                        text: "Use este formulário para enviar informações para o servidor. Em termos técnicos, isso é uma requisição POST." 
+                    },
+                    { 
+                        title: "Visualizando Dados (GET)", 
+                        text: "Aqui aparecem os itens salvos no banco de dados. O navegador faz um pedido GET para buscar essa lista." 
+                    },
+                    { 
+                        title: "O Console Mágico", 
+                        text: "Tudo o que acontece nos bastidores aparece aqui. É como um raio-X da comunicação entre seu navegador e o servidor." 
+                    }
+                ],
+
+                get currentStep() {
+                    return this.tutorialSteps[this.tutorial.step];
+                },
 
                 init() {
-                    this.handleRouteChange();
-                },
-
-                get baseUrl() {
-                    return `/api/${this.currentRoute}/`;
-                },
-
-                toggleHelp(topic) {
-                    this.activeHelp = this.activeHelp === topic ? null : topic;
-                },
-
-                getPostFields() {
-                    if (!this.routeInfo.actions || !this.routeInfo.actions.POST) return 'Campos desconhecidos';
-                    return Object.keys(this.routeInfo.actions.POST).join(', ');
-                },
-
-                async log(method, url, status, info = null) {
-                    this.logs.unshift({ method, url, status, info });
-                    if (this.logs.length > 30) this.logs.pop();
-                },
-
-                async handleRouteChange() {
-                    this.dataList = [];
-                    this.routeInfo = {};
-                    this.availableMethods = [];
+                    this.fetchItems();
                     
-                    // 1. Fetch Metadata (Auto-Help)
-                    await this.fetchOptions();
-                    // 2. Fetch Data
-                    await this.fetchData();
-                },
-
-                async fetchOptions() {
-                    try {
-                        const res = await fetch(this.baseUrl, { method: 'OPTIONS' });
-                        const data = await res.json();
-                        
-                        this.routeInfo = data;
-                        this.availableMethods = ['GET']; // Default assumption
-                        if (data.actions && data.actions.POST) this.availableMethods.push('POST');
-                        // DRF OPTIONS doesn't always explicitly list DELETE/PUT in top level, but 'actions' implies write access
-                        if (data.renders.includes('application/json')) {
-                            // Simple heuristic for demo
-                            if (this.currentRoute === 'tasks') {
-                                this.availableMethods.push('PUT', 'DELETE');
-                            }
-                        }
-                        
-                        this.log('OPTIONS', this.baseUrl, res.status, 'Metadados carregados');
-                    } catch (e) {
-                        console.error(e);
-                        this.log('OPTIONS', this.baseUrl, 'ERR', 'Falha ao carregar metadados');
+                    // Auto-start tutorial if first visit (simulated)
+                    if (!localStorage.getItem('tutorialDone')) {
+                        setTimeout(() => this.startTutorial(), 1000);
                     }
                 },
 
-                async fetchData() {
+                // Tutorial Methods
+                startTutorial() {
+                    this.tutorial.active = true;
+                    this.tutorial.step = 0;
+                    this.userLevel = 'beginner'; // Force beginner mode for tutorial
+                },
+                nextStep() {
+                    if (this.tutorial.step < this.tutorialSteps.length - 1) {
+                        this.tutorial.step++;
+                    } else {
+                        this.endTutorial();
+                    }
+                },
+                endTutorial() {
+                    this.tutorial.active = false;
+                    localStorage.setItem('tutorialDone', 'true');
+                    this.showToast('success', 'Tutorial Concluído!', 'Agora você está pronto para explorar.');
+                },
+
+                // Routing
+                switchRoute(route) {
+                    this.currentRoute = route;
+                    this.items = [];
+                    this.fetchItems();
+                    
+                    // Update available methods based on route
+                    if (route === 'users') {
+                        this.methods = ['GET'];
+                        this.showToast('info', 'Modo Leitura', 'A rota de Usuários é protegida contra alterações.');
+                    } else {
+                        this.methods = ['GET', 'POST', 'PATCH', 'DELETE'];
+                    }
+                },
+
+                // API Interactions
+                async fetchItems() {
                     this.isLoading = true;
-                    try {
-                        const res = await fetch(this.baseUrl);
-                        if (res.ok) {
-                            this.dataList = await res.json();
-                        }
-                        this.log('GET', this.baseUrl, res.status);
-                    } catch (e) {
-                        this.log('GET', this.baseUrl, 'ERR');
-                    } finally {
-                        this.isLoading = false;
-                    }
+                    await this.apiCall('GET', '');
+                    this.isLoading = false;
                 },
 
-                // Task Specific Actions
-                async createTask() {
+                async createItem() {
+                    if (!this.newItem.title) {
+                        this.showToast('error', 'Ops!', 'O título é obrigatório.');
+                        return;
+                    }
                     this.isLoading = true;
-                    try {
-                        const res = await fetch(this.baseUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(this.newTask)
-                        });
-                        if (res.ok) {
-                            const created = await res.json();
-                            this.dataList.unshift(created);
-                            this.newTask = { title: '', description: '' };
-                        }
-                        this.log('POST', this.baseUrl, res.status);
-                    } catch (e) {
-                        this.log('POST', this.baseUrl, 'ERR');
-                    } finally {
-                        this.isLoading = false;
+                    const success = await this.apiCall('POST', '', this.newItem);
+                    if (success) {
+                        this.newItem = { title: '', description: '' };
+                        this.showToast('success', 'Sucesso!', 'Item criado no servidor.');
+                        // Refresh list
+                        this.fetchItems();
+                    }
+                    this.isLoading = false;
+                },
+
+                async deleteItem(id) {
+                    if (!confirm('Tem certeza que deseja apagar?')) return;
+                    const success = await this.apiCall('DELETE', `${id}/`);
+                    if (success) {
+                        this.items = this.items.filter(i => i.id !== id);
+                        this.showToast('success', 'Apagado!', 'O item foi removido do banco de dados.');
                     }
                 },
 
-                async toggleTask(item) {
-                    const newStatus = !item.completed;
-                    try {
-                        const res = await fetch(`${this.baseUrl}${item.id}/`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ completed: newStatus })
-                        });
-                        if (res.ok) {
-                            item.completed = newStatus;
-                        }
-                        this.log('PATCH', `${this.baseUrl}${item.id}/`, res.status);
-                    } catch (e) {
-                        this.log('PATCH', `${this.baseUrl}${item.id}/`, 'ERR');
+                async toggleItem(item) {
+                    const original = item.completed;
+                    item.completed = !item.completed; // Optimistic update
+                    
+                    const success = await this.apiCall('PATCH', `${item.id}/`, { completed: item.completed });
+                    if (!success) {
+                        item.completed = original; // Revert
+                        this.showToast('error', 'Erro', 'Não foi possível atualizar o status.');
                     }
                 },
 
-                async deleteTask(id) {
-                    if(!confirm('Deletar?')) return;
+                // Core API Logic
+                async apiCall(method, path, body = null) {
+                    const url = `/api/${this.currentRoute}/${path}`;
+                    const logId = Date.now();
+                    
+                    // Add pending log
+                    this.logs.unshift({
+                        id: logId,
+                        method,
+                        url,
+                        status: 0, // Pending
+                        payload: body
+                    });
+
                     try {
-                        const res = await fetch(`${this.baseUrl}${id}/`, { method: 'DELETE' });
-                        if (res.ok) {
-                            this.dataList = this.dataList.filter(i => i.id !== id);
+                        const options = {
+                            method,
+                            headers: { 'Content-Type': 'application/json' }
+                        };
+                        if (body) options.body = JSON.stringify(body);
+
+                        const res = await fetch(url, options);
+                        
+                        // Update log with status
+                        const logIndex = this.logs.findIndex(l => l.id === logId);
+                        if (logIndex !== -1) {
+                            this.logs[logIndex].status = res.status;
                         }
-                        this.log('DELETE', `${this.baseUrl}${id}/`, res.status);
-                    } catch (e) {
-                        this.log('DELETE', `${this.baseUrl}${id}/`, 'ERR');
+
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                        // Handle response data
+                        if (method === 'GET') {
+                            this.items = await res.json();
+                        }
+                        return true;
+
+                    } catch (error) {
+                        console.error(error);
+                        const logIndex = this.logs.findIndex(l => l.id === logId);
+                        if (logIndex !== -1) {
+                            this.logs[logIndex].status = 'ERR';
+                        }
+                        this.showToast('error', 'Erro de Conexão', 'Não foi possível falar com o servidor.');
+                        return false;
                     }
+                },
+
+                // Toast System
+                showToast(type, title, message) {
+                    const id = Date.now();
+                    const emojis = { success: '✅', error: '❌', info: '💡' };
+                    this.toasts.push({ id, type, title, message, emoji: emojis[type], visible: true });
+                    
+                    setTimeout(() => {
+                        const index = this.toasts.findIndex(t => t.id === id);
+                        if (index !== -1) this.toasts[index].visible = false;
+                    }, 3000);
                 }
             }
         }
