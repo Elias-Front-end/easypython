@@ -4,7 +4,7 @@ import multiprocessing
 # https://docs.gunicorn.org/en/stable/configure.html#configuration-file
 
 # Server socket
-bind = "0.0.0.0:8000"
+bind = "0.0.0.0:80"
 
 # Worker processes
 workers = multiprocessing.cpu_count() * 2 + 1

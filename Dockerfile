@@ -25,7 +25,7 @@ COPY . .
 RUN python manage.py collectstatic --noinput
 
 # Expor a porta que o Gunicorn vai usar
-EXPOSE 8000
+EXPOSE 80
 
 # Comando para iniciar a aplicação usando Gunicorn com arquivo de configuração
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app_api.wsgi:application"]
