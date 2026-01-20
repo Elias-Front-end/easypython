@@ -18,6 +18,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 # EasyPanel usually provides the host, so we allow all or configure specifically
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
 
+# Trust the X-Forwarded-Proto header for SSL (required behind proxies like EasyPanel/Traefik)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 
