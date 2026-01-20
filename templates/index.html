@@ -3,339 +3,372 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Tarefas & Playground API</title>
+    <title>EasyPython API Explorer</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
-        /* Custom Scrollbar for Logs */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans text-gray-800" x-data="taskApp()">
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800" x-data="apiExplorer()">
 
     <!-- Navbar -->
-    <nav class="bg-indigo-600 text-white shadow-lg">
-        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+    <nav class="bg-gradient-to-r from-indigo-700 to-indigo-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center space-x-2">
-                <span class="text-2xl">🚀</span>
-                <h1 class="text-xl font-bold">EasyPython Task Manager</h1>
+                <span class="text-2xl">⚡</span>
+                <h1 class="text-xl font-bold tracking-tight">EasyPython Explorer</h1>
             </div>
-            <div class="space-x-4 text-sm">
-                <a href="/api/docs/" target="_blank" class="hover:text-indigo-200 transition">📄 Swagger API</a>
-                <a href="/admin/" target="_blank" class="hover:text-indigo-200 transition">🛠️ Admin</a>
+            
+            <!-- Route Selector -->
+            <div class="flex items-center bg-indigo-800 rounded-lg p-1 border border-indigo-500">
+                <span class="px-3 text-xs text-indigo-300 font-mono">ROTA ATUAL:</span>
+                <select x-model="currentRoute" @change="handleRouteChange" 
+                        class="bg-transparent text-white text-sm font-mono focus:outline-none py-1 px-2 cursor-pointer">
+                    <option value="tasks">/api/tasks/</option>
+                    <option value="users">/api/users/</option>
+                </select>
+            </div>
+
+            <div class="space-x-4 text-sm hidden md:block">
+                <a href="/api/docs/" target="_blank" class="hover:text-indigo-200 transition">Swagger</a>
+                <a href="/admin/" target="_blank" class="hover:text-indigo-200 transition">Admin</a>
             </div>
         </div>
     </nav>
 
     <div class="container mx-auto px-4 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            <!-- Coluna da Esquerda: Aplicação -->
-            <div class="lg:col-span-2 space-y-6">
-                
-                <!-- Card de Nova Tarefa -->
-                <div class="bg-white rounded-xl shadow-md p-6 border-t-4 border-indigo-500 relative group/card">
-                    <!-- Help Tooltip POST -->
-                    <div class="absolute top-4 right-4 text-gray-400 hover:text-indigo-600 cursor-help" title="Clique para saber mais" @click="showHelp('post')">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    </div>
-
-                    <h2 class="text-lg font-semibold mb-4 text-gray-700 flex items-center">
-                        <span class="bg-indigo-100 text-indigo-600 p-2 rounded-lg mr-2 font-mono text-sm">POST /api/tasks/</span>
-                        Nova Tarefa
+        
+        <!-- Dynamic Auto-Help Header -->
+        <div class="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <span x-text="routeInfo.name || 'Carregando...'"></span>
+                        <span class="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500 font-normal border border-gray-200">Recurso</span>
                     </h2>
-
-                    <!-- Help Content -->
-                    <div x-show="helpTopic === 'post'" x-transition class="mb-4 bg-indigo-50 p-4 rounded-lg border border-indigo-200 text-sm text-indigo-800" x-cloak>
-                        <p class="font-bold mb-1">📖 O que é POST?</p>
-                        <p>O método <strong>POST</strong> é usado para <strong>enviar dados novos</strong> ao servidor. Neste formulário, estamos empacotando o "Título" e a "Descrição" em um formato JSON e enviando para a API criar um novo registro no banco de dados.</p>
-                    </div>
-
-                    <form @submit.prevent="createTask" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Título *</label>
-                            <input type="text" x-model="newTask.title" placeholder="Ex: Aprender Django" 
-                                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                            <p class="text-xs text-gray-400 mt-1">Parâmetro obrigatório: `title` (string)</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                            <textarea x-model="newTask.description" placeholder="Detalhes da tarefa..." rows="2"
-                                      class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
-                            <p class="text-xs text-gray-400 mt-1">Parâmetro opcional: `description` (string)</p>
-                        </div>
-                        <button type="submit" 
-                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2"
-                                :disabled="isLoading">
-                            <span x-show="isLoading" class="animate-spin">⌛</span>
-                            <span>Criar Tarefa (POST)</span>
-                        </button>
-                    </form>
+                    <p class="text-gray-600 mt-1" x-text="routeInfo.description || 'Selecione uma rota para ver a documentação automática.'"></p>
                 </div>
-
-                <!-- Lista de Tarefas -->
-                <div class="bg-white rounded-xl shadow-md overflow-hidden relative">
-                    <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                        <div class="flex items-center">
-                            <h2 class="text-lg font-semibold text-gray-700 flex items-center">
-                                <span class="bg-green-100 text-green-600 p-2 rounded-lg mr-2 font-mono text-sm">GET /api/tasks/</span>
-                                Suas Tarefas
-                            </h2>
-                            <!-- Help Tooltip GET -->
-                            <div class="ml-2 text-gray-400 hover:text-green-600 cursor-help" title="Clique para saber mais" @click="showHelp('get')">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                        </div>
-                        <button @click="fetchTasks" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                            🔄 Atualizar Lista
-                        </button>
-                    </div>
-
-                    <!-- Help Content -->
-                    <div x-show="helpTopic === 'get'" x-transition class="bg-green-50 p-4 border-b border-green-200 text-sm text-green-800" x-cloak>
-                        <p class="font-bold mb-1">📖 O que é GET?</p>
-                        <p>O método <strong>GET</strong> solicita dados do servidor. A API retorna uma <strong>Lista (Array)</strong> de objetos JSON contendo todas as tarefas salvas. O navegador apenas "lê" esses dados e desenha a lista abaixo.</p>
-                    </div>
-
-                    <div x-show="tasks.length === 0 && !isLoading" class="p-8 text-center text-gray-500" x-cloak>
-                        <p class="mb-2">📭 Nenhuma tarefa encontrada.</p>
-                        <p class="text-sm">Use o formulário acima para criar a primeira!</p>
-                    </div>
-
-                    <ul class="divide-y divide-gray-200">
-                        <template x-for="task in tasks" :key="task.id">
-                            <li class="p-4 hover:bg-gray-50 transition duration-150 group">
-                                <div class="flex items-start justify-between">
-                                    <div class="flex items-start gap-3 flex-1">
-                                        <!-- Checkbox (PATCH) -->
-                                        <   class="mt-1 w-6 h-6 border-2 rounded flex-shrink-0 flex items-center justify-center transition-colors duration-200"
-                                                ss="task.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-indigo-500'"
-                                                e="Marcar como concluído (PATCH)">
-                                            <svghow="task.completed" class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                        </bu>
-                                            <h3 class="text-lg font-medium text-gray-900" 
-                                                    :class="{'line-through text-gray-400': task.completed}" 
-                                                    x-text="task.title"></h3>
-                                                <p class="text-gray-500 text-sm mt-1" x-text="task.description || 'Sem descrição'"></p>
-                                                <div class="mt-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <div class="relative group/tooltip">
-                                                        <button @click="startEdit(task)" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
-                                                            ✏️ Editar (PUT)
-                                                        </button>
-                                                        <div class="absolute bottom-full mb-2 hidden group-hover/tooltip:block bg-gray-800 text-white text-xs p-2 rounded w-48 z-10">
-                                                            <strong>PUT:</strong> Substitui o objeto inteiro. Enviamos título e descrição atualizados para salvar.
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="relative group/tooltip">
-                                                        <button @click="deleteTask(task.id)" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200">
-                                                            🗑️ Deletar (DELETE)
-                                                        </button>
-                                                        <div class="absolute bottom-full mb-2 hidden group-hover/tooltip:block bg-gray-800 text-white text-xs p-2 rounded w-48 z-10">
-                                                            <strong>DELETE:</strong> Apaga o registro permanentemente usando o ID <code>/api/tasks/ID/</code>.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Modo Edição -->
-                                            <div x-show="editingId === task.id" x-cloak class="bg-gray-50 p-3 rounded-lg border border-blue-200">
-                                                <input type="text" x-model="editForm.title" class="w-full mb-2 px-2 py-1 border rounded text-sm">
-                                                <textarea x-model="editForm.description" rows="2" class="w-full mb-2 px-2 py-1 border rounded text-sm"></textarea>
-                                                <div class="flex justify-end gap-2">
-                                                    <button @click="cancelEdit" class="text-xs text-gray-600 hover:text-gray-800">Cancelar</button>
-                                                    <button @click="saveEdit(task.id)" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Salvar</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <span class="text-xs text-gray-400 font-mono" x-text="'ID: ' + task.id"></span>
-                                </div>
-                            </li>
-                        </template>
-                    </ul>
+                <div class="flex gap-2">
+                    <template x-for="method in availableMethods" :key="method">
+                        <span class="px-3 py-1 rounded text-xs font-bold border"
+                              :class="{
+                                  'bg-green-50 border-green-200 text-green-700': method === 'GET',
+                                  'bg-indigo-50 border-indigo-200 text-indigo-700': method === 'POST',
+                                  'bg-blue-50 border-blue-200 text-blue-700': method === 'PUT',
+                                  'bg-red-50 border-red-200 text-red-700': method === 'DELETE'
+                              }" x-text="method"></span>
+                    </template>
                 </div>
             </div>
+            
+            <!-- Schema Info -->
+            <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 text-sm">
+                <h3 class="font-bold text-gray-700 mb-2 flex items-center gap-2">
+                    <span>💡</span> O que você pode fazer aqui?
+                </h3>
+                <ul class="space-y-2 text-gray-600">
+                    <li x-show="availableMethods.includes('GET')" class="flex gap-2">
+                        <span class="font-mono text-green-600 font-bold">GET</span>
+                        <span>Listar todos os registros de <span class="font-semibold" x-text="routeInfo.name"></span>.</span>
+                    </li>
+                    <li x-show="availableMethods.includes('POST')" class="flex gap-2">
+                        <span class="font-mono text-indigo-600 font-bold">POST</span>
+                        <span>Criar novo item enviando: <code class="bg-gray-200 px-1 rounded text-xs" x-text="getPostFields()"></code></span>
+                    </li>
+                    <li x-show="!availableMethods.includes('POST') && !isLoading" class="flex gap-2 text-gray-400">
+                        <span class="font-mono">POST</span>
+                        <span>Criação não permitida nesta rota (Apenas Leitura).</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
 
-            <!-- Coluna da Direita: Console / Logs -->
-            <div class="lg:col-span-1">
-                <div class="sticky top-6">
-                    <div class="bg-gray-900 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col h-[600px]">
-                        <div class="bg-gray-800 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
-                            <h3 class="text-gray-100 font-mono text-sm flex items-center">
-                                <span class="text-green-400 mr-2">➜</span> API Console Log
-                            </h3>
-                            <button @click="logs = []" class="text-xs text-gray-500 hover:text-gray-300">Limpar</button>
+        <!-- Main Content Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Interactive UI -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- CUSTOM UI FOR TASKS -->
+                <div x-show="currentRoute === 'tasks'" x-transition>
+                    <!-- Create Task Form -->
+                    <div class="bg-white rounded-xl shadow-md p-6 border-t-4 border-indigo-500 mb-6 relative group/card">
+                        <div class="absolute top-4 right-4 text-gray-400 hover:text-indigo-600 cursor-help" title="Ajuda do POST" @click="toggleHelp('post')">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </div>
+                        <h3 class="text-lg font-semibold mb-4 text-gray-700">Nova Tarefa</h3>
                         
-                        <div class="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs" id="console-logs">
+                        <div x-show="activeHelp === 'post'" class="mb-4 bg-indigo-50 p-3 rounded text-xs text-indigo-800 border border-indigo-100">
+                            <strong>POST /api/tasks/</strong>: Envia um JSON com <code>title</code> e <code>description</code> para criar.
+                        </div>
+
+                        <form @submit.prevent="createTask" class="space-y-4">
+                            <input type="text" x-model="newTask.title" placeholder="Título da tarefa..." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                            <textarea x-model="newTask.description" placeholder="Descrição (opcional)..." rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition" :disabled="isLoading">
+                                <span x-show="!isLoading">Adicionar Tarefa</span>
+                                <span x-show="isLoading">...</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Task List -->
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-semibold text-gray-700">Lista de Tarefas</h3>
+                            <button @click="fetchData" class="text-indigo-600 text-sm font-medium hover:underline">Atualizar</button>
+                        </div>
+                        <ul class="divide-y divide-gray-200">
+                            <template x-for="item in dataList" :key="item.id">
+                                <li class="p-4 hover:bg-gray-50 transition group">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <button @click="toggleTask(item)" 
+                                                    class="w-5 h-5 border-2 rounded flex items-center justify-center transition"
+                                                    :class="item.completed ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-indigo-500'">
+                                                <svg x-show="item.completed" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                            </button>
+                                            <div>
+                                                <p class="font-medium text-gray-900" :class="{'line-through text-gray-400': item.completed}" x-text="item.title"></p>
+                                                <p class="text-sm text-gray-500" x-text="item.description"></p>
+                                            </div>
+                                        </div>
+                                        <button @click="deleteTask(item.id)" class="text-gray-300 hover:text-red-500 transition px-2">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </li>
+                            </template>
+                            <li x-show="dataList.length === 0" class="p-8 text-center text-gray-500">Nenhuma tarefa encontrada.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- GENERIC UI FOR OTHER ROUTES (USERS) -->
+                <div x-show="currentRoute !== 'tasks'" x-transition x-cloak>
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-semibold text-gray-700 flex items-center gap-2">
+                                <span>📂</span> Explorador de Dados
+                            </h3>
+                            <button @click="fetchData" class="text-indigo-600 text-sm font-medium hover:underline">Atualizar</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">JSON Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <template x-for="item in dataList" :key="item.id || Math.random()">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 whitespace-pre-wrap text-xs font-mono text-gray-600">
+                                                <span x-text="JSON.stringify(item, null, 2)"></span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="dataList.length === 0">
+                                        <td class="px-6 py-8 text-center text-gray-500">Nenhum registro encontrado.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Generic Create Form (Disabled if not POST) -->
+                    <div x-show="availableMethods.includes('POST')" class="mt-6 bg-white rounded-xl shadow-md p-6 border-t-4 border-gray-400 opacity-50 relative">
+                         <div class="absolute inset-0 flex items-center justify-center bg-gray-50/50">
+                             <span class="bg-white px-4 py-2 rounded-full shadow text-sm font-medium text-gray-600">Formulário Genérico (Em breve)</span>
+                         </div>
+                         <h3 class="text-lg font-semibold mb-4 text-gray-700">Criar Novo</h3>
+                         <div class="h-24 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Console -->
+            <div class="lg:col-span-1">
+                <div class="sticky top-20">
+                    <div class="bg-gray-900 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col h-[500px]">
+                        <div class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center">
+                            <span class="text-xs font-mono text-green-400">➜ API Logs</span>
+                            <button @click="logs = []" class="text-xs text-gray-500 hover:text-white">Limpar</button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs" id="console-logs">
                             <template x-if="logs.length === 0">
-                                <div class="text-gray-600 text-center mt-10">
-                                    <p>Nenhuma requisição feita ainda.</p>
-                                    <p>Interaja com o app para ver os logs!</p>
+                                <div class="text-gray-600 text-center mt-10 opacity-50">
+                                    Aguardando requisições...
                                 </div>
                             </template>
-                            
-                            <template x-for="(log, index) in logs" :key="index">
-                                <div class="border-b border-gray-800 pb-2 last:border-0">
+                            <template x-for="(log, i) in logs" :key="i">
+                                <div class="border-b border-gray-800 pb-2 last:border-0 animate-fade-in-up">
                                     <div class="flex items-center gap-2 mb-1">
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                        <span class="px-1 rounded font-bold text-[10px]"
                                               :class="{
                                                   'bg-green-900 text-green-300': log.method === 'GET',
                                                   'bg-indigo-900 text-indigo-300': log.method === 'POST',
                                                   'bg-blue-900 text-blue-300': log.method === 'PUT' || log.method === 'PATCH',
-                                                  'bg-red-900 text-red-300': log.method === 'DELETE'
+                                                  'bg-red-900 text-red-300': log.method === 'DELETE',
+                                                  'bg-purple-900 text-purple-300': log.method === 'OPTIONS'
                                               }" x-text="log.method"></span>
-                                        <span class="text-gray-300 break-all" x-text="log.url"></span>
-                                        <span class="ml-auto text-[10px]" 
-                                              :class="log.status >= 200 && log.status < 300 ? 'text-green-400' : 'text-red-400'"
-                                              x-text="log.status"></span>
+                                        <span class="text-gray-400 truncate" x-text="log.url"></span>
+                                        <span class="ml-auto" :class="log.status < 300 ? 'text-green-400' : 'text-red-400'" x-text="log.status"></span>
                                     </div>
-                                    
-                                    <!-- Payload (Se houver) -->
-                                    <template x-if="log.payload">
-                                        <div class="mb-1">
-                                            <span class="text-gray-500 block">Payload (Enviado):</span>
-                                            <pre class="text-indigo-300 overflow-x-auto whitespace-pre-wrap break-words" x-text="JSON.stringify(log.payload, null, 2)"></pre>
-                                        </div>
+                                    <template x-if="log.info">
+                                         <div class="text-purple-300 mb-1 italic" x-text="log.info"></div>
                                     </template>
-
-                                    <!-- Response -->
-                                    <div>
-                                        <span class="text-gray-500 block">Response (Recebido):</span>
-                                        <pre class="text-yellow-100 overflow-x-auto whitespace-pre-wrap break-words" x-text="JSON.stringify(log.response, null, 2)"></pre>
-                                    </div>
-                                    <div class="text-gray-600 text-[10px] mt-1 text-right" x-text="log.time"></div>
                                 </div>
                             </template>
                         </div>
                     </div>
-                    
-                    <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-                        <h4 class="font-bold flex items-center gap-2 mb-2">
-                            <span>💡</span> Dica de Auto Ajuda
-                        </h4>
-                        <p>Observe o console acima para entender como sua API funciona. Cada clique gera uma requisição HTTP real.</p>
-                        <ul class="list-disc list-inside mt-2 space-y-1 text-xs">
-                            <li><strong>POST</strong>: Cria dados novos.</li>
-                            <li><strong>GET</strong>: Busca dados.</li>
-                            <li><strong>PATCH</strong>: Atualiza parte do dado (ex: só o status).</li>
-                            <li><strong>DELETE</strong>: Remove dados.</li>
-                        </ul>
+                    <div class="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 text-sm text-blue-800">
+                        <p><strong>Status do Console:</strong> <span class="text-green-600">Ativo</span></p>
+                        <p class="text-xs mt-1 text-blue-600">Este painel monitora todas as chamadas `fetch` feitas por esta página.</p>
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 
     <script>
-        function taskApp() {
+        function apiExplorer() {
             return {
-                tasks: [],
-                helpTopic: null,                newTask: { title: '', description: '' },
-
-                editingId: null,
-                editForm: { title:s();
-                },
-
-                 howHelp'topic' {
-                    this.helpTopic = this.helpTopic === topic ? null : topic, description: '' },
-                isLoading: false,
+                currentRoute: 'tasks',
+                dataList: [],
+                routeInfo: {},
+                availableMethods: [],
+                newTask: { title: '', description: '' },
                 logs: [],
+                isLoading: false,
+                activeHelp: null,
 
                 init() {
-                    this.fetchTasks();
+                    this.handleRouteChange();
                 },
 
-                // Função auxiliar para logar no console visual
-                addLog(method, url, status, payload, response) {
-                    const time = new Date().toLocaleTimeString();
-                    this.logs.unshift({ method, url, status, payload, response, time });
-                    // Limitar a 20 logs para não travar
-                    if (this.logs.length > 20) this.logs.pop();
+                get baseUrl() {
+                    return `/api/${this.currentRoute}/`;
                 },
 
-                async apiCall(url, method = 'GET', body = null) {
-                    const options = {
-                        method: method,
-                        headers: { 'Content-Type': 'application/json' }
-                    };
-                    if (body) options.body = JSON.stringify(body);
+                toggleHelp(topic) {
+                    this.activeHelp = this.activeHelp === topic ? null : topic;
+                },
 
+                getPostFields() {
+                    if (!this.routeInfo.actions || !this.routeInfo.actions.POST) return 'Campos desconhecidos';
+                    return Object.keys(this.routeInfo.actions.POST).join(', ');
+                },
+
+                async log(method, url, status, info = null) {
+                    this.logs.unshift({ method, url, status, info });
+                    if (this.logs.length > 30) this.logs.pop();
+                },
+
+                async handleRouteChange() {
+                    this.dataList = [];
+                    this.routeInfo = {};
+                    this.availableMethods = [];
+                    
+                    // 1. Fetch Metadata (Auto-Help)
+                    await this.fetchOptions();
+                    // 2. Fetch Data
+                    await this.fetchData();
+                },
+
+                async fetchOptions() {
                     try {
-                        const res = await fetch(url, options);
-                        let data = null;
-                        if (res.status !== 204) {
-                            try { data = await res.json(); } catch(e) { data = {}; }
+                        const res = await fetch(this.baseUrl, { method: 'OPTIONS' });
+                        const data = await res.json();
+                        
+                        this.routeInfo = data;
+                        this.availableMethods = ['GET']; // Default assumption
+                        if (data.actions && data.actions.POST) this.availableMethods.push('POST');
+                        // DRF OPTIONS doesn't always explicitly list DELETE/PUT in top level, but 'actions' implies write access
+                        if (data.renders.includes('application/json')) {
+                            // Simple heuristic for demo
+                            if (this.currentRoute === 'tasks') {
+                                this.availableMethods.push('PUT', 'DELETE');
+                            }
                         }
                         
-                        this.addLog(method, url, res.status, body, data);
-                        return { ok: res.ok, data };
-                    } catch (error) {
-                        this.addLog(method, url, 'ERROR', body, { error: error.message });
-                        return { ok: false };
+                        this.log('OPTIONS', this.baseUrl, res.status, 'Metadados carregados');
+                    } catch (e) {
+                        console.error(e);
+                        this.log('OPTIONS', this.baseUrl, 'ERR', 'Falha ao carregar metadados');
                     }
                 },
 
-                async fetchTasks() {
+                async fetchData() {
                     this.isLoading = true;
-                    const { ok, data } = await this.apiCall('/api/tasks/');
-                    if (ok) this.tasks = data;
-                    this.isLoading = false;
+                    try {
+                        const res = await fetch(this.baseUrl);
+                        if (res.ok) {
+                            this.dataList = await res.json();
+                        }
+                        this.log('GET', this.baseUrl, res.status);
+                    } catch (e) {
+                        this.log('GET', this.baseUrl, 'ERR');
+                    } finally {
+                        this.isLoading = false;
+                    }
                 },
 
+                // Task Specific Actions
                 async createTask() {
                     this.isLoading = true;
-                    const { ok, data } = await this.apiCall('/api/tasks/', 'POST', this.newTask);
-                    if (ok) {
-                        this.tasks.unshift(data);
-                        this.newTask = { title: '', description: '' };
+                    try {
+                        const res = await fetch(this.baseUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newTask)
+                        });
+                        if (res.ok) {
+                            const created = await res.json();
+                            this.dataList.unshift(created);
+                            this.newTask = { title: '', description: '' };
+                        }
+                        this.log('POST', this.baseUrl, res.status);
+                    } catch (e) {
+                        this.log('POST', this.baseUrl, 'ERR');
+                    } finally {
+                        this.isLoading = false;
                     }
-                    this.isLoading = false;
                 },
 
-                async toggleTask(task) {
-                    // Cópia para otimistic UI
-                    const originalStatus = task.completed;
-                    task.completed = !task.completed;
-
-                    const { ok } = await this.apiCall(`/api/tasks/${task.id}/`, 'PATCH', { completed: task.completed });
-                    
-                    if (!ok) task.completed = originalStatus; // Reverte se falhar
+                async toggleTask(item) {
+                    const newStatus = !item.completed;
+                    try {
+                        const res = await fetch(`${this.baseUrl}${item.id}/`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ completed: newStatus })
+                        });
+                        if (res.ok) {
+                            item.completed = newStatus;
+                        }
+                        this.log('PATCH', `${this.baseUrl}${item.id}/`, res.status);
+                    } catch (e) {
+                        this.log('PATCH', `${this.baseUrl}${item.id}/`, 'ERR');
+                    }
                 },
 
                 async deleteTask(id) {
-                    if (!confirm('Tem certeza que deseja apagar esta tarefa?')) return;
-                    
-                    const { ok } = await this.apiCall(`/api/tasks/${id}/`, 'DELETE');
-                    if (ok) {
-                        this.tasks = this.tasks.filter(t => t.id !== id);
-                    }
-                },
-
-                startEdit(task) {
-                    this.editingId = task.id;
-                    this.editForm = { ...task };
-                },
-
-                cancelEdit() {
-                    this.editingId = null;
-                    this.editForm = { title: '', description: '' };
-                },
-
-                async saveEdit(id) {
-                    const { ok, data } = await this.apiCall(`/api/tasks/${id}/`, 'PUT', this.editForm);
-                    if (ok) {
-                        // Atualiza a tarefa na lista local
-                        const index = this.tasks.findIndex(t => t.id === id);
-                        if (index !== -1) this.tasks[index] = data;
-                        this.cancelEdit();
+                    if(!confirm('Deletar?')) return;
+                    try {
+                        const res = await fetch(`${this.baseUrl}${id}/`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.dataList = this.dataList.filter(i => i.id !== id);
+                        }
+                        this.log('DELETE', `${this.baseUrl}${id}/`, res.status);
+                    } catch (e) {
+                        this.log('DELETE', `${this.baseUrl}${id}/`, 'ERR');
                     }
                 }
             }
