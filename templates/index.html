@@ -419,6 +419,11 @@
                 },
 
                 async createTask() {
+                    // Force sync from editor if available
+                    if (this.editor) {
+                        this.newTask.code = this.editor.getValue();
+                    }
+
                     if (!this.newTask.title || !this.newTask.code) {
                         alert('Preencha título e código.');
                         return;
