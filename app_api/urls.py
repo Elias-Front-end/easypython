@@ -19,7 +19,43 @@ router.register(r'users', UserViewSet)
 
 @api_view(['GET'])
 def health_check(request):
-    return Response({"status": "ok", "message": "API running on EasyPanel!"})
+    """
+    Endpoint para verificar a saúde do sistema e dependências.
+    """
+    import os
+    import sys
+    
+    # Verifica conexão com DB
+    try:
+        from django.db import connection
+        connection.ensure_connection()
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
+    # Verifica Celery/Redis (Tentativa simples)
+    try:
+        from app_api.celery import app
+        # Apenas verifica se a configuração existe, não testa conexão real para não travar
+        celery_status = "configured"
+    except Exception as e:
+        celery_status = f"error: {str(e)}"
+
+    return Response({
+        "status": "ok", 
+        "message": "API running on EasyPanel!",
+        "system": {
+            "platform": sys.platform,
+            "python": sys.version,
+            "cwd": os.getcwd(),
+        },
+        "database": db_status,
+        "celery": celery_status,
+        "env": {
+            "debug": os.environ.get('DEBUG', 'False'),
+            "allowed_hosts": os.environ.get('ALLOWED_HOSTS', 'Not Set'),
+        }
+    })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
