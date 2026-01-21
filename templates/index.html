@@ -341,8 +341,14 @@
                 initEditor() {
                     const container = document.getElementById('editor-container');
                     container.innerHTML = ''; // Clear previous
+                    
+                    // Se não tiver código, usa o default
+                    if (!this.newTask.code) {
+                        this.newTask.code = "print('Hello World')";
+                    }
+
                     this.editor = CodeMirror(container, {
-                        value: this.newTask.code || "print('Hello World')",
+                        value: this.newTask.code,
                         mode: "python",
                         theme: "dracula",
                         lineNumbers: true,
