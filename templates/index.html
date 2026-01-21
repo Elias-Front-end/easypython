@@ -582,10 +582,12 @@
                 },
 
                 async viewLogs(id) {
+                    this.activeLogs = []; // Limpa logs antigos antes de carregar
+                    this.showLogs = true;
+                    
                     const logs = await this.apiCall('GET', `tasks/${id}/logs/`);
                     if (logs) {
                         this.activeLogs = logs;
-                        this.showLogs = true;
                     }
                 }
             }
