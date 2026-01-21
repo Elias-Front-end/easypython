@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db.models import Count, Q
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Task, TaskLog
 from .serializers import TaskSerializer, TaskLogSerializer
 from .tasks import execute_task
@@ -41,21 +42,11 @@ class TaskLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = TaskLog.objects.all().order_by('-created_at')
     serializer_class = TaskLogSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'task__task_type', 'task']
     search_fields = ['task__title', 'status', 'output']
     ordering_fields = ['created_at', 'duration']
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        status = self.request.query_params.get('status')
-        task_id = self.request.query_params.get('task_id')
-        
-        if status:
-            queryset = queryset.filter(status=status)
-        if task_id:
-            queryset = queryset.filter(task_id=task_id)
-            
-        return queryset
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
