@@ -15,7 +15,7 @@ class Task(models.Model):
     
     # Agendamento
     enabled = models.BooleanField(default=True)
-    schedule = models.OneToOneField(PeriodicTask, on_delete=models.SET_NULL, null=True, blank=True)
+    schedule = models.OneToOneField(PeriodicTask, on_delete=models.SET_NULL, null=True, blank=True, related_name='easy_runner_task')
     
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
