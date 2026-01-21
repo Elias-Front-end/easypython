@@ -7,6 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FullCalendar -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    
+    <!-- Custom Scripts -->
+    <script src="/static/js/taskScheduler.js"></script>
+
     <!-- CodeMirror for Editor -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
@@ -57,6 +64,12 @@
                         :class="currentView === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                     Dashboard
+                </button>
+                <button @click="currentView = 'calendar'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+                        :class="currentView === 'calendar' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Calendário
                 </button>
                 <button @click="currentView = 'create'" 
                         class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
@@ -170,6 +183,17 @@
                 </div>
             </div>
 
+            <!-- Calendar View -->
+            <div x-show="currentView === 'calendar'" class="space-y-6 animate-fade-in" x-cloak>
+                 <header>
+                    <h2 class="text-2xl font-bold text-white">Calendário de Execuções</h2>
+                    <p class="text-gray-400 text-sm">Visualize o histórico e agendamentos</p>
+                </header>
+                <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                    <div id="calendar" class="text-gray-200 font-sans"></div>
+                </div>
+            </div>
+
             <!-- Create Task View -->
             <div x-show="currentView === 'create'" class="max-w-4xl mx-auto space-y-6 animate-fade-in" x-cloak>
                 <header>
@@ -188,6 +212,17 @@
                             <select x-model="newTask.task_type" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none">
                                 <option value="script">🐍 Script Python</option>
                                 <option value="command">💻 Comando Shell (Bash)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-300">Prioridade</label>
+                            <select x-model="newTask.priority" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="low">🟢 Baixa</option>
+                                <option value="medium">🟡 Média</option>
+                                <option value="high">🔴 Alta</option>
                             </select>
                         </div>
                     </div>
@@ -272,10 +307,11 @@
                 currentView: 'dashboard',
                 tasks: [],
                 stats: {},
-                newTask: { title: '', description: '', task_type: 'script', code: '', cron_expression: '', enabled: true },
+                newTask: { title: '', description: '', task_type: 'script', priority: 'medium', code: '', cron_expression: '', enabled: true },
                 loginForm: { username: '', password: '' },
                 isLoading: false,
                 editor: null,
+                scheduler: null,
                 showLogs: false,
                 activeLogs: [],
 
@@ -290,6 +326,15 @@
                         if (val === 'create') {
                             setTimeout(() => this.initEditor(), 100);
                         }
+                        if (val === 'calendar') {
+                            setTimeout(() => this.initCalendar(), 100);
+                        }
+                    });
+                    
+                    // Listen for calendar events
+                    window.addEventListener('open-create-task', (e) => {
+                         this.currentView = 'create';
+                         // Optionally pre-fill date if we support one-off
                     });
                 },
 
@@ -306,6 +351,14 @@
                     this.editor.on('change', (cm) => {
                         this.newTask.code = cm.getValue();
                     });
+                },
+                
+                initCalendar() {
+                    if (!this.scheduler) {
+                        this.scheduler = new TaskScheduler('calendar', this);
+                    } else {
+                        this.scheduler.calendar.render();
+                    }
                 },
 
                 async apiCall(method, endpoint, body = null) {
@@ -366,7 +419,7 @@
                     }
                     
                     await this.apiCall('POST', 'tasks/', this.newTask);
-                    this.newTask = { title: '', description: '', task_type: 'script', code: '', cron_expression: '', enabled: true };
+                    this.newTask = { title: '', description: '', task_type: 'script', priority: 'medium', code: '', cron_expression: '', enabled: true };
                     this.currentView = 'dashboard';
                     this.fetchTasks();
                     this.fetchStats();

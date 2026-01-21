@@ -7,10 +7,17 @@ class Task(models.Model):
         ('script', 'Script Python'),
         ('command', 'Comando Shell'),
     ]
+
+    PRIORITY_CHOICES = [
+        ('low', 'Baixa'),
+        ('medium', 'Média'),
+        ('high', 'Alta'),
+    ]
     
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     task_type = models.CharField(max_length=20, choices=TASK_TYPES, default='script')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
     code = models.TextField(help_text="Código Python ou Comando Bash")
     
     # Agendamento

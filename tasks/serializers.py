@@ -17,7 +17,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'task_type', 'code', 'enabled', 'created_by', 'created_at', 'last_run', 'cron_expression', 'schedule_display']
+        fields = ['id', 'title', 'description', 'task_type', 'priority', 'code', 'enabled', 'created_by', 'created_at', 'last_run', 'cron_expression', 'schedule_display']
         read_only_fields = ['created_by', 'created_at']
 
     def get_last_run(self, obj):
