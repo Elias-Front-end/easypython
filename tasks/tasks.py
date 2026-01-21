@@ -3,7 +3,25 @@ import subprocess
 import time
 import sys
 import io
+from django.utils import timezone
+from datetime import timedelta
 from .models import Task, TaskLog
+
+@shared_task(bind=True)
+def cleanup_old_logs(self, days=30):
+    """
+    Remove logs de execução mais antigos que 'days'.
+    
+    Args:
+        days (int): Número de dias de retenção (padrão: 30)
+    
+    Returns:
+        dict: Contagem de logs deletados
+    """
+    cutoff_date = timezone.now() - timedelta(days=days)
+    deleted_count, _ = TaskLog.objects.filter(created_at__lt=cutoff_date).delete()
+    
+    return {"deleted": deleted_count, "cutoff_date": str(cutoff_date)}
 
 @shared_task(bind=True)
 def execute_task(self, task_id):
