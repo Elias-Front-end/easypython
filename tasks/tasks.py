@@ -3,9 +3,13 @@ import subprocess
 import time
 import sys
 import io
+import logging
 from django.utils import timezone
 from datetime import timedelta
 from .models import Task, TaskLog
+
+# Configuração de logger de fallback
+logger = logging.getLogger(__name__)
 
 @shared_task(bind=True)
 def cleanup_old_logs(self, days=30):
@@ -27,14 +31,22 @@ def cleanup_old_logs(self, days=30):
 def execute_task(self, task_id):
     """
     Executa o código da tarefa (Python ou Shell) e salva o log.
+    Inclui mecanismo de fallback para logging crítico.
     """
     try:
         task_obj = Task.objects.get(id=task_id)
     except Task.DoesNotExist:
+        logger.error(f"CRITICAL: Task {task_id} not found during execution.")
         return f"Task {task_id} not found"
 
     # Cria log inicial
-    log = TaskLog.objects.create(task=task_obj, status='running')
+    try:
+        log = TaskLog.objects.create(task=task_obj, status='running')
+    except Exception as e:
+        logger.error(f"CRITICAL: Failed to create TaskLog for Task {task_id}: {e}")
+        # Fallback: Tenta continuar mesmo sem log no banco (não recomendado, mas evita crash total)
+        log = None
+
     start_time = time.time()
     
     stdout = ""
@@ -74,12 +86,22 @@ def execute_task(self, task_id):
     except Exception as e:
         stderr = f"System Error: {str(e)}"
         status = "error"
+        logger.error(f"Task {task_id} Execution Failed: {e}")
 
     # Atualiza log final
-    log.status = status
-    log.output = stdout
-    log.error = stderr
-    log.duration = time.time() - start_time
-    log.save()
+    duration = time.time() - start_time
+    
+    if log:
+        try:
+            log.status = status
+            log.output = stdout
+            log.error = stderr
+            log.duration = duration
+            log.save()
+        except Exception as e:
+            logger.critical(f"FAILED TO SAVE TASK LOG for Task {task_id}. Status: {status}. Error: {e}")
+    else:
+        # Fallback se log não foi criado: Logar no sistema
+        logger.info(f"Task {task_id} finished (NO DB LOG). Status: {status}. Duration: {duration}s")
 
     return f"Task {task_id} finished with {status}"
