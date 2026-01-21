@@ -35,6 +35,15 @@ class TaskViewSet(viewsets.ModelViewSet):
         serializer = TaskLogSerializer(logs, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['delete'])
+    def clear_logs(self, request, pk=None):
+        """
+        Limpa todos os logs de uma tarefa específica.
+        """
+        task = self.get_object()
+        deleted_count, _ = TaskLog.objects.filter(task=task).delete()
+        return Response({'status': 'success', 'message': f'{deleted_count} logs removidos.'})
+
 class TaskLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet para visualizar logs globais com filtros.
