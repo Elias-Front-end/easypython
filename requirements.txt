@@ -6,3 +6,7 @@ whitenoise
 drf-spectacular
 djangorestframework-simplejwt
 django-filter
+celery
+redis
+django-celery-beat
+django-celery-results

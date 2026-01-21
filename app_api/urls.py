@@ -8,12 +8,13 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from .views import index, UserViewSet  # Importar views
-from tasks.views import TaskViewSet
+from .views import index, UserViewSet
+from tasks.views import TaskViewSet, TaskLogViewSet, dashboard_stats
 
 # Router Principal
 router = DefaultRouter()
 router.register(r'tasks', TaskViewSet)
+router.register(r'logs', TaskLogViewSet)
 router.register(r'users', UserViewSet)
 
 @api_view(['GET'])
@@ -30,5 +31,9 @@ urlpatterns = [
     
     path('health/', health_check),
     path('', index),
-    path('api/', include(router.urls)), # Inclui todas as rotas do router
+    path('api/stats/', dashboard_stats), # Nova rota de stats
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/', include(router.urls)),
 ]
+

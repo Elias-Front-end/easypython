@@ -21,13 +21,33 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar o restante do código do projeto
 COPY . .
 
-# Coletar arquivos estáticos
-RUN python manage.py makemigrations && \
-    python manage.py migrate && \
+# Script de entrypoint para rodar serviços
+COPY <<EOF /app/entrypoint.sh
+#!/bin/bash
+set -e
+
+# Se o primeiro argumento for 'worker', roda o Celery
+if [ "\$1" = 'worker' ]; then
+    echo "Iniciando Celery Worker..."
+    celery -A app_api worker -l info
+# Se o primeiro argumento for 'beat', roda o Celery Beat
+elif [ "\$1" = 'beat' ]; then
+    echo "Iniciando Celery Beat..."
+    celery -A app_api beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+# Caso contrário, roda o servidor web (padrão)
+else
+    echo "Iniciando Servidor Web..."
+    python manage.py makemigrations
+    python manage.py migrate
     python manage.py collectstatic --noinput
+    gunicorn -c gunicorn.conf.py app_api.wsgi:application
+fi
+EOF
+
+RUN chmod +x /app/entrypoint.sh
 
 # Expor a porta que o Gunicorn vai usar
 EXPOSE 80
 
-# Comando para iniciar a aplicação usando Gunicorn com arquivo de configuração
-CMD ["gunicorn", "-c", "gunicorn.conf.py", "app_api.wsgi:application"]
+# Comando padrão
+ENTRYPOINT ["/app/entrypoint.sh"]

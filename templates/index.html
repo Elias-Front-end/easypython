@@ -3,346 +3,343 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EasyPython API - Advanced Mode</title>
+    <title>EasyRunner - Task Scheduler</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CodeMirror for Editor -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/shell/shell.min.js"></script>
+
     <style>
         [x-cloak] { display: none !important; }
         body { font-family: 'Inter', sans-serif; }
-        .font-mono { font-family: 'Fira Code', monospace; }
-        
-        /* Animações */
-        @keyframes slideIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .CodeMirror { height: 300px; border-radius: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800" x-data="app()">
+<body class="bg-gray-900 text-gray-100 min-h-screen" x-data="runnerApp()">
 
-    <!-- Login Modal -->
-    <div x-show="showLogin" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" x-cloak>
-        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md border border-slate-200" @click.outside="showLogin = false">
-            <h2 class="text-2xl font-bold mb-2">Autenticação JWT</h2>
-            <p class="text-sm text-slate-500 mb-6">Obtenha um token para acessar rotas protegidas.</p>
-            
+    <!-- Login Overlay -->
+    <div x-show="!token" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/95 backdrop-blur-sm" x-cloak>
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-indigo-400">EasyRunner ⚡</h1>
+                <p class="text-gray-400 mt-2">Plataforma de Execução de Tarefas</p>
+            </div>
             <form @submit.prevent="login" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Username</label>
-                    <input type="text" x-model="loginForm.username" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Password</label>
-                    <input type="password" x-model="loginForm.password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium transition" :disabled="isLoading">
-                    <span x-show="!isLoading">Obter Token</span>
-                    <span x-show="isLoading">...</span>
+                <input type="text" x-model="loginForm.username" placeholder="Usuário" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                <input type="password" x-model="loginForm.password" placeholder="Senha" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition transform hover:scale-[1.02]">
+                    <span x-show="!isLoading">Entrar no Console</span>
+                    <span x-show="isLoading">Autenticando...</span>
                 </button>
             </form>
-            <div class="mt-4 pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
-                Dica: Crie um usuário primeiro na rota de Usuários (POST) se ainda não tiver um.
-            </div>
         </div>
     </div>
 
-    <!-- Toast Notifications -->
-    <div class="fixed top-4 right-4 z-[90] space-y-2">
-        <template x-for="toast in toasts" :key="toast.id">
-            <div x-show="toast.visible" x-transition.duration.300ms
-                 class="p-4 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] border-l-4 bg-white"
-                 :class="{
-                     'border-green-500': toast.type === 'success',
-                     'border-red-500': toast.type === 'error',
-                     'border-blue-500': toast.type === 'info'
-                 }">
-                <span x-text="toast.emoji" class="text-xl"></span>
-                <div>
-                    <h4 class="font-bold text-sm" x-text="toast.title"></h4>
-                    <p class="text-xs opacity-90" x-text="toast.message"></p>
-                </div>
-            </div>
-        </template>
-    </div>
-
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="container mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="bg-indigo-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm">EP</div>
-                <h1 class="font-bold text-slate-800 hidden md:block">EasyPython API <span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-normal">v2.0</span></h1>
-            </div>
-
-            <!-- Route Switcher -->
-            <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
-                <button @click="switchRoute('tasks')" 
-                        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
-                        :class="currentRoute === 'tasks' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
-                    Tarefas
-                </button>
-                <button @click="switchRoute('users')" 
-                        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all"
-                        :class="currentRoute === 'users' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
-                    Usuários
-                </button>
-            </div>
-
-            <div class="flex items-center gap-3">
-                <!-- Auth Status -->
-                <div class="flex items-center gap-2">
-                    <template x-if="token">
-                        <div class="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200 text-xs font-medium cursor-pointer" @click="logout" title="Clique para sair">
-                            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Autenticado
-                        </div>
-                    </template>
-                    <template x-if="!token">
-                        <button @click="showLogin = true" class="text-xs font-medium bg-slate-800 text-white px-3 py-1.5 rounded-full hover:bg-slate-700 transition">
-                            Login (JWT)
-                        </button>
-                    </template>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <main class="container mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <!-- App Layout -->
+    <div class="flex h-screen overflow-hidden">
         
-        <!-- Left Column: Interactive App -->
-        <div class="lg:col-span-7 space-y-6">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+            <div class="p-6 border-b border-gray-700 flex items-center gap-3">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">ER</div>
+                <span class="font-bold text-lg tracking-tight">EasyRunner</span>
+            </div>
             
-            <!-- Context Header -->
-            <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white rounded-2xl p-6 shadow-lg relative overflow-hidden">
-                <div class="relative z-10 flex justify-between items-start">
+            <nav class="flex-1 p-4 space-y-2">
+                <button @click="currentView = 'dashboard'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+                        :class="currentView === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    Dashboard
+                </button>
+                <button @click="currentView = 'create'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all"
+                        :class="currentView === 'create' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-400 hover:bg-gray-700 hover:text-white'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Nova Tarefa
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-700">
+                <button @click="logout" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    Sair do Sistema
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto bg-gray-900 p-8">
+            
+            <!-- Dashboard View -->
+            <div x-show="currentView === 'dashboard'" class="space-y-8 animate-fade-in">
+                <header class="flex justify-between items-center">
                     <div>
-                        <div class="flex items-center gap-2 mb-2 opacity-80">
-                            <span class="uppercase text-[10px] font-bold tracking-wider border border-white/30 px-1 rounded">RESOURCE</span>
-                            <span class="font-mono text-sm" x-text="`/api/${currentRoute}/`"></span>
+                        <h2 class="text-2xl font-bold text-white">Painel de Controle</h2>
+                        <p class="text-gray-400 text-sm">Monitoramento de tarefas em tempo real</p>
+                    </div>
+                    <button @click="fetchTasks" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-700 text-sm transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Atualizar
+                    </button>
+                </header>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                        <div class="text-gray-400 text-sm font-medium mb-1">Total de Tarefas</div>
+                        <div class="text-3xl font-bold text-white" x-text="stats.total_tasks || 0">0</div>
+                        <div class="text-xs text-gray-500 mt-2">
+                            <span class="text-green-400" x-text="stats.active_tasks || 0">0</span> Ativas
                         </div>
-                        <h2 class="text-2xl font-bold mb-2" x-text="currentRoute === 'tasks' ? 'Gerenciamento de Tarefas' : 'Gerenciamento de Usuários'"></h2>
-                        <div class="flex gap-2 text-xs">
-                            <span class="bg-white/20 px-2 py-0.5 rounded">Pagination: ON</span>
-                            <span class="bg-white/20 px-2 py-0.5 rounded">Filtering: ON</span>
-                            <span class="bg-white/20 px-2 py-0.5 rounded">Auth: JWT</span>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                        <div class="text-gray-400 text-sm font-medium mb-1">Execuções Registradas</div>
+                        <div class="text-3xl font-bold text-indigo-400" x-text="stats.total_executions || 0">0</div>
+                        <div class="text-xs text-gray-500 mt-2">
+                            Taxa de Sucesso: <span class="text-white" x-text="(stats.success_rate || 0) + '%'">0%</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700">
+                        <div class="text-gray-400 text-sm font-medium mb-1">Falhas</div>
+                        <div class="text-3xl font-bold text-red-400" x-text="stats.failed_executions || 0">0</div>
+                        <div class="text-xs text-gray-500 mt-2">
+                           Erros recentes
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Task List -->
+                <div class="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+                    <div class="p-6 border-b border-gray-700">
+                        <h3 class="font-bold text-white">Minhas Tarefas</h3>
+                    </div>
+                    <div class="divide-y divide-gray-700">
+                        <template x-for="task in tasks" :key="task.id">
+                            <div class="p-6 hover:bg-gray-700/50 transition group">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex items-start gap-4">
+                                        <div class="p-3 rounded-lg bg-gray-700 border border-gray-600">
+                                            <span class="text-2xl" x-text="task.task_type === 'script' ? '🐍' : '💻'"></span>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <h4 class="font-bold text-white text-lg" x-text="task.title"></h4>
+                                                <span x-show="task.schedule_display" class="bg-indigo-900/50 text-indigo-300 text-xs px-2 py-0.5 rounded border border-indigo-700" title="Cron Schedule">
+                                                    ⏰ <span x-text="task.schedule_display"></span>
+                                                </span>
+                                            </div>
+                                            <p class="text-gray-400 text-sm mt-1" x-text="task.description || 'Sem descrição'"></p>
+                                            
+                                            <div class="flex gap-3 mt-3 text-xs">
+                                                <span class="bg-gray-700 px-2 py-1 rounded text-gray-300 font-mono" x-text="task.task_type"></span>
+                                                <span class="bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-900/50" 
+                                                      x-show="task.last_run && task.last_run.status === 'success'">
+                                                    Último: Sucesso
+                                                </span>
+                                                <span class="bg-red-900/30 text-red-400 px-2 py-1 rounded border border-red-900/50" 
+                                                      x-show="task.last_run && task.last_run.status === 'error'">
+                                                    Último: Erro
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3">
+                                        <button @click="runTask(task.id)" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            Executar
+                                        </button>
+                                        <button @click="viewLogs(task.id)" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg transition" title="Ver Logs">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="tasks.length === 0" class="p-12 text-center text-gray-500">
+                            Nenhuma tarefa cadastrada.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Filters & Search -->
-            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center">
-                <div class="flex-1 min-w-[200px] relative">
-                    <svg class="w-4 h-4 absolute left-3 top-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    <input type="text" x-model="searchQuery" @input.debounce.500ms="fetchItems(1)"
-                           :placeholder="currentRoute === 'tasks' ? 'Buscar tarefa por título...' : 'Buscar usuário por nome/email...'"
-                           class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                </div>
-                
-                <!-- Extra Filters -->
-                <select x-show="currentRoute === 'tasks'" x-model="filters.completed" @change="fetchItems(1)" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
-                    <option value="">Todos Status</option>
-                    <option value="true">Concluídos</option>
-                    <option value="false">Pendentes</option>
-                </select>
-                
-                <select x-show="currentRoute === 'users'" x-model="filters.is_staff" @change="fetchItems(1)" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
-                    <option value="">Todos Tipos</option>
-                    <option value="true">Staff</option>
-                    <option value="false">Normal</option>
-                </select>
-            </div>
+            <!-- Create Task View -->
+            <div x-show="currentView === 'create'" class="max-w-4xl mx-auto space-y-6 animate-fade-in" x-cloak>
+                <header>
+                    <h2 class="text-2xl font-bold text-white">Nova Tarefa</h2>
+                    <p class="text-gray-400 text-sm">Configure scripts Python ou comandos Shell</p>
+                </header>
 
-            <!-- Create Form (Generic) -->
-            <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-mono">POST</span>
-                    Criar Novo
-                </h3>
-                
-                <form @submit.prevent="createItem" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Fields for Tasks -->
-                    <template x-if="currentRoute === 'tasks'">
-                        <div class="contents">
-                            <div class="md:col-span-2">
-                                <input type="text" x-model="newItem.title" placeholder="Título da Tarefa *" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                            </div>
-                            <div class="md:col-span-2">
-                                <textarea x-model="newItem.description" rows="2" placeholder="Descrição..." class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
-                            </div>
+                <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 space-y-6">
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-300">Nome da Tarefa</label>
+                            <input type="text" x-model="newTask.title" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Backup Diário">
                         </div>
-                    </template>
-
-                    <!-- Fields for Users -->
-                    <template x-if="currentRoute === 'users'">
-                        <div class="contents">
-                            <div>
-                                <input type="text" x-model="newItem.username" placeholder="Username *" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                            </div>
-                            <div>
-                                <input type="email" x-model="newItem.email" placeholder="Email" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                            </div>
-                            <div class="md:col-span-2">
-                                <input type="password" x-model="newItem.password" placeholder="Password *" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                                <p class="text-[10px] text-slate-400 mt-1">A senha será enviada com hash seguro pelo backend.</p>
-                            </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-300">Tipo de Execução</label>
+                            <select x-model="newTask.task_type" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="script">🐍 Script Python</option>
+                                <option value="command">💻 Comando Shell (Bash)</option>
+                            </select>
                         </div>
-                    </template>
+                    </div>
 
-                    <div class="md:col-span-2 flex justify-end">
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition flex items-center gap-2" :disabled="isLoading">
-                            <span x-show="isLoading" class="animate-spin">⌛</span>
-                            Salvar
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                             <label class="text-sm font-medium text-gray-300 flex justify-between">
+                                <span>Agendamento (Cron)</span>
+                                <a href="https://crontab.guru/" target="_blank" class="text-indigo-400 text-xs hover:underline">Ajuda?</a>
+                            </label>
+                            <input type="text" x-model="newTask.cron_expression" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none font-mono" placeholder="* * * * * (Opcional)">
+                            <p class="text-xs text-gray-500">Deixe em branco para execução apenas manual.</p>
+                        </div>
+                        <div class="space-y-2 flex items-center pt-6">
+                             <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" x-model="newTask.enabled" class="form-checkbox h-5 w-5 text-indigo-600 bg-gray-900 border-gray-600 rounded">
+                                <span class="text-gray-300">Habilitar Agendamento</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-300">Descrição</label>
+                        <textarea x-model="newTask.description" rows="2" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-300 flex justify-between">
+                            <span>Código / Comando</span>
+                            <span class="text-xs text-gray-500 font-mono">Use Ctrl+Space para autocomplete (placeholder)</span>
+                        </label>
+                        <!-- CodeMirror Container -->
+                        <div id="editor-container"></div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-700">
+                        <button @click="currentView = 'dashboard'" class="px-6 py-2.5 text-gray-400 hover:text-white transition">Cancelar</button>
+                        <button @click="createTask" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-lg font-bold transition flex items-center gap-2">
+                            <span>Salvar Tarefa</span>
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
 
-            <!-- List (GET) -->
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div class="flex items-center gap-2">
-                        <span class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-mono">GET</span>
-                        <span class="text-sm text-slate-500" x-text="`Página ${currentPage} de ${totalPages} • Total: ${totalCount}`"></span>
+            <!-- Logs Modal -->
+            <div x-show="showLogs" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/90 backdrop-blur-sm" x-cloak @click.self="showLogs = false">
+                <div class="bg-gray-800 w-full max-w-4xl h-[80vh] rounded-2xl shadow-2xl border border-gray-700 flex flex-col">
+                    <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                        <h3 class="font-bold text-white text-lg">Histórico de Execução</h3>
+                        <button @click="showLogs = false" class="text-gray-400 hover:text-white">✕</button>
                     </div>
-                    
-                    <!-- Pagination Controls -->
-                    <div class="flex gap-1">
-                        <button @click="fetchItems(currentPage - 1)" :disabled="!prevUrl" class="px-3 py-1 text-xs border rounded hover:bg-slate-100 disabled:opacity-50">Anterior</button>
-                        <button @click="fetchItems(currentPage + 1)" :disabled="!nextUrl" class="px-3 py-1 text-xs border rounded hover:bg-slate-100 disabled:opacity-50">Próximo</button>
-                    </div>
-                </div>
-
-                <div class="divide-y divide-slate-100">
-                    <template x-for="item in items" :key="item.id">
-                        <div class="p-4 hover:bg-slate-50 transition group flex items-center justify-between">
-                            <div class="flex items-center gap-4">
-                                <!-- Status Icon -->
-                                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                     :class="currentRoute === 'tasks' ? (item.completed ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600') : (item.is_staff ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600')">
-                                    <template x-if="currentRoute === 'tasks'">
-                                        <span x-text="item.completed ? '✓' : '⏳'"></span>
-                                    </template>
-                                    <template x-if="currentRoute === 'users'">
-                                        <span x-text="item.is_staff ? '🛡️' : '👤'"></span>
-                                    </template>
+                    <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                        <template x-for="log in activeLogs" :key="log.id">
+                            <div class="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
+                                <div class="p-3 bg-gray-950/50 border-b border-gray-700 flex justify-between items-center text-xs">
+                                    <span class="text-gray-400 font-mono" x-text="new Date(log.created_at).toLocaleString()"></span>
+                                    <span class="px-2 py-0.5 rounded font-bold uppercase"
+                                          :class="log.status === 'success' ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'"
+                                          x-text="log.status"></span>
                                 </div>
-
-                                <div>
-                                    <h4 class="font-medium text-slate-800" x-text="item.title || item.username"></h4>
-                                    <p class="text-xs text-slate-500" x-text="item.description || item.email || 'Sem descrição'"></p>
+                                <div class="p-4 font-mono text-sm overflow-x-auto">
+                                    <div x-show="log.output" class="text-gray-300 whitespace-pre-wrap" x-text="log.output"></div>
+                                    <div x-show="log.error" class="text-red-400 whitespace-pre-wrap mt-2 pt-2 border-t border-gray-700" x-text="log.error"></div>
+                                    <div x-show="!log.output && !log.error" class="text-gray-600 italic">Sem output registrado.</div>
                                 </div>
                             </div>
-
-                            <div class="flex items-center gap-2">
-                                <!-- Action Buttons -->
-                                <template x-if="currentRoute === 'tasks'">
-                                    <button @click="toggleItem(item)" class="text-xs border px-2 py-1 rounded hover:bg-slate-100 transition">
-                                        Status
-                                    </button>
-                                </template>
-                                
-                                <button @click="deleteItem(item.id)" class="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition" title="Deletar">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
+                        </template>
+                        <div x-show="activeLogs.length === 0" class="text-center text-gray-500 py-10">
+                            Nenhum log encontrado para esta tarefa.
                         </div>
-                    </template>
-                    
-                    <div x-show="items.length === 0" class="p-8 text-center text-slate-500 text-sm">
-                        Nenhum registro encontrado com os filtros atuais.
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Right Column: Console -->
-        <div class="lg:col-span-5 space-y-6">
-            
-            <div class="bg-slate-900 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[600px] border border-slate-800">
-                <div class="bg-slate-950 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
-                    <span class="text-xs font-mono text-slate-400">Network Activity</span>
-                    <button @click="logs = []" class="text-xs text-slate-500 hover:text-white transition">Clear</button>
-                </div>
-
-                <div class="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs" id="console-logs">
-                    <template x-for="log in logs" :key="log.id">
-                        <div class="animate-slide-in border-l-2 pl-3 py-1"
-                             :class="{
-                                 'border-green-500': log.status < 300,
-                                 'border-red-500': log.status >= 400,
-                                 'border-blue-500': log.status === 0
-                             }">
-                            <div class="flex items-center justify-between mb-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold px-1.5 py-0.5 rounded text-[10px]"
-                                          :class="{
-                                              'bg-green-500/20 text-green-400': log.method === 'GET',
-                                              'bg-indigo-500/20 text-indigo-400': log.method === 'POST',
-                                              'bg-yellow-500/20 text-yellow-400': log.method === 'PATCH',
-                                              'bg-red-500/20 text-red-400': log.method === 'DELETE',
-                                          }" x-text="log.method"></span>
-                                    <span class="text-slate-300 break-all" x-text="log.url"></span>
-                                </div>
-                                <span :class="log.status < 300 ? 'text-green-400' : 'text-red-400'" x-text="log.status || '...'"></span>
-                            </div>
-                            
-                            <!-- Auth Header Info -->
-                            <div x-show="log.headers && log.headers.Authorization" class="text-[10px] text-yellow-500/80 mb-1 truncate">
-                                🔒 Auth: Bearer <span x-text="log.headers.Authorization.substring(7, 20) + '...'"></span>
-                            </div>
-
-                            <div x-show="log.payload" class="mt-2 bg-slate-800/50 p-2 rounded text-slate-300 overflow-x-auto">
-                                <pre x-text="JSON.stringify(log.payload, null, 2)"></pre>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
-
-    </main>
+        </main>
+    </div>
 
     <script>
-        function app() {
+        function runnerApp() {
             return {
-                currentRoute: 'tasks',
-                items: [],
-                newItem: { title: '', description: '', username: '', email: '', password: '' },
-                logs: [],
-                isLoading: false,
-                toasts: [],
-                
-                // Auth
                 token: localStorage.getItem('access_token') || null,
-                showLogin: false,
+                currentView: 'dashboard',
+                tasks: [],
+                stats: {},
+                newTask: { title: '', description: '', task_type: 'script', code: '', cron_expression: '', enabled: true },
                 loginForm: { username: '', password: '' },
-                
-                // Pagination & Filters
-                currentPage: 1,
-                totalPages: 1,
-                totalCount: 0,
-                nextUrl: null,
-                prevUrl: null,
-                searchQuery: '',
-                filters: { completed: '', is_staff: '' },
+                isLoading: false,
+                editor: null,
+                showLogs: false,
+                activeLogs: [],
 
                 init() {
-                    this.fetchItems();
+                    if (this.token) {
+                        this.fetchTasks();
+                        this.fetchStats();
+                    }
+                    
+                    // Init CodeMirror when view changes to create
+                    this.$watch('currentView', (val) => {
+                        if (val === 'create') {
+                            setTimeout(() => this.initEditor(), 100);
+                        }
+                    });
                 },
 
-                // Auth Methods
+                initEditor() {
+                    const container = document.getElementById('editor-container');
+                    container.innerHTML = ''; // Clear previous
+                    this.editor = CodeMirror(container, {
+                        value: this.newTask.code || "print('Hello World')",
+                        mode: "python",
+                        theme: "dracula",
+                        lineNumbers: true,
+                        tabSize: 4
+                    });
+                    this.editor.on('change', (cm) => {
+                        this.newTask.code = cm.getValue();
+                    });
+                },
+
+                async apiCall(method, endpoint, body = null) {
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+
+                    try {
+                        const res = await fetch(`/api/${endpoint}`, {
+                            method, headers,
+                            body: body ? JSON.stringify(body) : null
+                        });
+
+                        if (res.status === 401) {
+                            this.logout();
+                            return null;
+                        }
+                        
+                        return res.json();
+                    } catch (e) {
+                        console.error("API Error", e);
+                        return null;
+                    }
+                },
+
                 async login() {
                     this.isLoading = true;
-                    const success = await this.apiCall('POST', 'token/', this.loginForm, true); // true = auth route
-                    if (success) {
-                        this.token = success.access;
+                    const data = await this.apiCall('POST', 'token/', this.loginForm);
+                    if (data && data.access) {
+                        this.token = data.access;
                         localStorage.setItem('access_token', this.token);
-                        this.showLogin = false;
-                        this.loginForm = { username: '', password: '' };
-                        this.showToast('success', 'Login Realizado', 'Token JWT recebido e armazenado.');
-                        this.fetchItems(); // Refresh with permissions
+                        this.fetchTasks();
+                        this.fetchStats();
+                    } else {
+                        alert('Login falhou. Verifique suas credenciais.');
                     }
                     this.isLoading = false;
                 },
@@ -350,140 +347,44 @@
                 logout() {
                     this.token = null;
                     localStorage.removeItem('access_token');
-                    this.showToast('info', 'Logout', 'Token removido.');
-                    this.fetchItems();
                 },
 
-                // Routing
-                switchRoute(route) {
-                    this.currentRoute = route;
-                    this.currentPage = 1;
-                    this.searchQuery = '';
-                    this.items = [];
-                    this.fetchItems();
+                async fetchTasks() {
+                    const data = await this.apiCall('GET', 'tasks/');
+                    if (data) this.tasks = data.results || [];
                 },
 
-                // API Interactions
-                async fetchItems(page = 1) {
-                    this.isLoading = true;
-                    this.currentPage = page;
+                async fetchStats() {
+                    const data = await this.apiCall('GET', 'stats/');
+                    if (data) this.stats = data;
+                },
+
+                async createTask() {
+                    if (!this.newTask.title || !this.newTask.code) {
+                        alert('Preencha título e código.');
+                        return;
+                    }
                     
-                    // Build Query Params
-                    const params = new URLSearchParams({ page: page });
-                    if (this.searchQuery) params.append('search', this.searchQuery);
-                    if (this.currentRoute === 'tasks' && this.filters.completed) params.append('completed', this.filters.completed);
-                    if (this.currentRoute === 'users' && this.filters.is_staff) params.append('is_staff', this.filters.is_staff);
-
-                    const data = await this.apiCall('GET', `api/${this.currentRoute}/?${params.toString()}`, null, true);
-                    
-                    if (data) {
-                        this.items = data.results;
-                        this.totalCount = data.count;
-                        this.totalPages = Math.ceil(data.count / 10); // Assuming page size 10
-                        this.nextUrl = data.next;
-                        this.prevUrl = data.previous;
-                    }
-                    this.isLoading = false;
+                    await this.apiCall('POST', 'tasks/', this.newTask);
+                    this.newTask = { title: '', description: '', task_type: 'script', code: '', cron_expression: '', enabled: true };
+                    this.currentView = 'dashboard';
+                    this.fetchTasks();
+                    this.fetchStats();
                 },
 
-                async createItem() {
-                    this.isLoading = true;
-                    // Clean payload based on route
-                    const payload = this.currentRoute === 'tasks' 
-                        ? { title: this.newItem.title, description: this.newItem.description }
-                        : { username: this.newItem.username, email: this.newItem.email, password: this.newItem.password };
-
-                    const success = await this.apiCall('POST', `api/${this.currentRoute}/`, payload, true);
-                    if (success) {
-                        this.newItem = { title: '', description: '', username: '', email: '', password: '' };
-                        this.showToast('success', 'Criado!', 'Registro adicionado com sucesso.');
-                        this.fetchItems(1);
-                    }
-                    this.isLoading = false;
+                async runTask(id) {
+                    if (!confirm('Executar esta tarefa agora?')) return;
+                    await this.apiCall('POST', `tasks/${id}/run/`);
+                    alert('Tarefa enviada para a fila de execução!');
+                    this.fetchStats();
                 },
 
-                async deleteItem(id) {
-                    if (!confirm('Tem certeza?')) return;
-                    const success = await this.apiCall('DELETE', `api/${this.currentRoute}/${id}/`, null, true);
-                    if (success !== false) { // Delete returns 204 (no content) which is falsy in some checks, so check strict false
-                        this.items = this.items.filter(i => i.id !== id);
-                        this.showToast('success', 'Removido', 'Registro apagado.');
+                async viewLogs(id) {
+                    const logs = await this.apiCall('GET', `tasks/${id}/logs/`);
+                    if (logs) {
+                        this.activeLogs = logs;
+                        this.showLogs = true;
                     }
-                },
-
-                async toggleItem(item) {
-                    if (this.currentRoute !== 'tasks') return;
-                    const original = item.completed;
-                    item.completed = !item.completed;
-                    
-                    const success = await this.apiCall('PATCH', `api/${this.currentRoute}/${item.id}/`, { completed: item.completed }, true);
-                    if (!success) {
-                        item.completed = original;
-                        this.showToast('error', 'Erro', 'Falha ao atualizar.');
-                    }
-                },
-
-                // Core API Logic
-                async apiCall(method, path, body = null, isFullUrl = false) {
-                    // Handle URL construction logic
-                    let url = isFullUrl ? path : `api/${path}`;
-                    if (!url.startsWith('api/') && !url.startsWith('token/')) url = `api/${url}`; // Safety
-                    if (url.startsWith('api/api/')) url = url.substring(4); // Double api fix
-
-                    // Normalize URL to be root-relative
-                    url = '/' + url.replace(/^\/+/, '');
-
-                    const logId = Date.now();
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
-
-                    this.logs.unshift({ id: logId, method, url, status: 0, payload: body, headers: this.token ? { Authorization: headers.Authorization } : null });
-
-                    try {
-                        const options = { method, headers };
-                        if (body) options.body = JSON.stringify(body);
-
-                        const res = await fetch(url, options);
-                        
-                        // Update Log
-                        const logIndex = this.logs.findIndex(l => l.id === logId);
-                        if (logIndex !== -1) this.logs[logIndex].status = res.status;
-
-                        if (res.status === 204) return true; // No content
-
-                        const data = await res.json();
-                        
-                        if (!res.ok) {
-                            // Handle Errors
-                            if (res.status === 401) {
-                                this.showToast('error', 'Não Autorizado', 'Faça login para realizar esta ação.');
-                                if (this.token) this.logout(); // Expired token
-                            } else {
-                                const errorMsg = JSON.stringify(data).substring(0, 50);
-                                this.showToast('error', `Erro ${res.status}`, errorMsg);
-                            }
-                            return false;
-                        }
-
-                        return data;
-
-                    } catch (error) {
-                        console.error(error);
-                        const logIndex = this.logs.findIndex(l => l.id === logId);
-                        if (logIndex !== -1) this.logs[logIndex].status = 'ERR';
-                        this.showToast('error', 'Erro de Rede', 'Verifique sua conexão.');
-                        return false;
-                    }
-                },
-
-                showToast(type, title, message) {
-                    const id = Date.now();
-                    const emojis = { success: '✅', error: '❌', info: '💡' };
-                    this.toasts.push({ id, type, title, message, emoji: emojis[type], visible: true });
-                    setTimeout(() => {
-                        const index = this.toasts.findIndex(t => t.id === id);
-                        if (index !== -1) this.toasts[index].visible = false;
-                    }, 3000);
                 }
             }
         }
